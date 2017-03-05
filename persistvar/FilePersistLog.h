@@ -9,7 +9,7 @@ namespace ns_persistent {
   #define DEFAULT_FILE_PERSIST_LOG_DATA_PATH (".plog")
 
   // FilePersistLog is the default persist Log
-  class FilePersistLog : PersistLog {
+  class FilePersistLog : public PersistLog {
   private:
     string dataPath;
 

@@ -17,7 +17,9 @@ namespace ns_persistent {
   //TODO
   // #define DEFINE_PERSIST_VAR(_t,_n) DEFINE_PERSIST_VAR(_t,_n,ST_FILE)
   #define DEFINE_PERSIST_VAR(_t,_n,_s) \
-    PersistVar(_t, ST_FILE) _n(# _n);
+    PersistVar<_t, _s> _n(# _n)
+  #define DECLARE_PERSIST_VAR(_t,_n,_s) \
+    extern DEFINE_PERSIST_VAR(_t,_n,_s)
 
   // PersistVar represents a variable backed up by persistent storage. The
   // backend is PersistLog class. PersistLog handles only raw bytes and this
@@ -55,7 +57,7 @@ namespace ns_persistent {
       };
       // destructor: release the resources
       virtual ~PersistVar<ObjectType,st>() noexcept(false){
-        if(this-m_pLog != NULL){
+        if(this->m_pLog != NULL){
           delete this->m_pLog;
         }
       };
@@ -76,7 +78,10 @@ namespace ns_persistent {
       };
 
       // set value: this increases the version number by 1.
-      virtual void set(const ObjectType &v);
+      virtual void set(const ObjectType &v) noexcept(false){
+        //TODO: get the specified version
+        throw PERSIST_EXP_UNIMPLEMENTED;
+      };
 
 #ifdef HLC_ENABLED
 
