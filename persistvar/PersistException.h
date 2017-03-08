@@ -24,6 +24,10 @@ namespace ns_persistent{
   #define PERSIST_EXP_RWLOCK_UNLOCK(x)                  PERSIST_EXP(13,(x))
   #define PERSIST_EXP_MSYNC(x)                          PERSIST_EXP(14,(x))
   #define PERSIST_EXP_INV_ENTRY_IDX(x)                  PERSIST_EXP(15,(x))
+  #define PERSIST_EXP_EMPTY_LOG                         PERSIST_EXP(16,0)
+  #define PERSIST_EXP_SPIN_INIT(x)                      PERSIST_EXP(17,(x))
+  #define PERSIST_EXP_SPIN_LOCK(x)                      PERSIST_EXP(18,(x))
+  #define PERSIST_EXP_SPIN_UNLOCK(x)                    PERSIST_EXP(19,(x))
 }
 
 #endif//PERSISTENT_EXCEPTION_H

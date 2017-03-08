@@ -46,7 +46,7 @@ namespace ns_persistent {
     virtual void append(const void * pdata, uint64_t size) noexcept(false);
     virtual uint64_t getLength() noexcept(false);
     virtual const void* getEntry(int64_t eno) noexcept(false);
-    virtual const void* getEntry() noexcept(false);
+    //virtual const void* getEntry() noexcept(false); - deprecated
   };
 }
 

@@ -1,4 +1,5 @@
 #include <iostream>
+#include <stdlib.h>
 #include "PersistVar.h"
 
 using namespace ns_persistent;
@@ -6,9 +7,17 @@ using namespace ns_persistent;
 class X {
 public:
   int x;
-  virtual ~X(){
-    cerr<<"X's destructor"<<endl;
+  static void* serialize(const X &x, uint64_t *psize){
+    int *buf = (int*)malloc(4);
+    *psize = 4;
+    *buf = x.x;
+    return (void*)buf;
   };
+  static X * deserialize(const void *pdata){
+    X *x = new X();
+    x->x = *(int*)pdata;
+    return x;
+  }
 };
 
 DEFINE_PERSIST_VAR(X,tstx,ST_FILE);

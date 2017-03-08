@@ -5,11 +5,11 @@
 #include <inttypes.h>
 #include <string>
 #include <iostream>
+#include <memory>
+#include <pthread.h>
 #include "PersistException.h"
 #include "PersistLog.h"
 #include "FilePersistLog.h"
-
-using namespace std;
 
 namespace ns_persistent {
 
@@ -21,13 +21,36 @@ namespace ns_persistent {
   #define DECLARE_PERSIST_VAR(_t,_n,_s) \
     extern DEFINE_PERSIST_VAR(_t,_n,_s)
 
+  // number of versions in the cache
+  #define MAX_NUM_CACHED_VERSION        (1024)
+  #define VERSION_HASH(v)               ( (int)((v) & (MAX_NUM_CACHED_VERSION-1)) )
+
+  // invalid version:
+  #define INVALID_VERSION (-1ll)
+
+  // read from cache
+  #define VERSION_IS_CACHED(v)  (this->m_aCache[VERSION_HASH(v)].ver == (v))
+  #define GET_CACHED_OBJ_PTR(v) (this->m_aCache[VERSION_HASH(v)].obj)
+
   // PersistVar represents a variable backed up by persistent storage. The
   // backend is PersistLog class. PersistLog handles only raw bytes and this
   // class is repsonsible for converting it back and forth between raw bytes
   // and ObjectType. But, the serialization/deserialization functionality is
   // actually defined by ObjectType and provided by PersistVar users.
   // - ObjectType: user-defined type of the variable it is required to support
-  //   serialization and deserialization
+  //   serialization and deserialization as follows:
+  //   // serialize
+  //   void * ObjectType::serialize(const ObjectType & obj, uint64_t *psize)
+  //   - obj: obj is the reference to the object to be serialized
+  //   - psize: psize is a uint64_t pointer to receive the size of the serialized
+  //     data.
+  //   - Return value is a pointer to a new malloced buffer with the serialized
+  //     //TODO: this may not be efficient for large object...open to be changed.
+  //   // deserialize
+  //   ObjectType * ObjectType::deserialize(const void *pdata)
+  //   - pdata: a buffer of the serialized data
+  //   - Return value is a pointer to a new created ObjectType deserialized from
+  //     'pdata' buffer.
   // - StorageType: storage type is defined in PersistLog. The value could be
   //   ST_FILE/ST_MEM/ST_3DXP ... I will start with ST_FILE and extend it to
   //   other persistent Storage.
@@ -41,6 +64,7 @@ namespace ns_persistent {
       // representation is created.
       // - objectName: name of the given object.
       PersistVar<ObjectType,st>(const char * objectName) noexcept(false){
+        // Initialize log
         this->m_pLog = NULL;
         switch(st){
 
@@ -54,33 +78,83 @@ namespace ns_persistent {
         default:
           throw PERSIST_EXP_STORAGE_TYPE_UNKNOWN(st);
         }
+        // Initialize the version cache:
+        int i;
+        for (i=0;i<MAX_NUM_CACHED_VERSION;i++){
+          this->m_aCache[i].ver = INVALID_VERSION;
+          if (pthread_spin_init(&this->m_aCache[i].lck,PTHREAD_PROCESS_SHARED) != 0) {
+            throw PERSIST_EXP_SPIN_INIT(errno);
+          }
+        }
       };
       // destructor: release the resources
       virtual ~PersistVar<ObjectType,st>() noexcept(false){
+        // destroy the spinlocks
+        int i;
+        for (i=0;i<MAX_NUM_CACHED_VERSION;i++){
+          pthread_spin_destroy(&this->m_aCache[i].lck);
+        }
+
+        // destroy the in-memory log
         if(this->m_pLog != NULL){
           delete this->m_pLog;
         }
       };
 
       // get the latest Value of T
-      virtual const ObjectType& get() noexcept(false){
-        //TODO: get the latest value
-        throw PERSIST_EXP_UNIMPLEMENTED;
+      virtual std::shared_ptr<ObjectType> get() noexcept(false){
+
+        // - get the latest version
+        int64_t ver = this->m_pLog->getLength() - 1;
+        if(ver < 0){
+          throw PERSIST_EXP_EMPTY_LOG;
+        }
+
+        return this->get(ver);
       };
 
       // get the value defined by version
       // version number >= 0
       // negtive number means how many versions we go back from the latest
       // version. -1 means the previous version.
-      virtual const ObjectType& get(const int64_t & version) noexcept(false){
-        //TODO: get the specified version
-        throw PERSIST_EXP_UNIMPLEMENTED;
+      virtual std::shared_ptr<ObjectType> get(const int64_t & version) noexcept(false){
+        int64_t ver = version;
+        std::shared_ptr<ObjectType> pObj;
+
+        if (ver < 0) {
+          ver += this->m_pLog->getLength();
+        }
+
+        // - lock
+        if (pthread_spin_lock(&this->m_aCache[VERSION_HASH(ver)].lck) != 0) {
+          throw PERSIST_EXP_SPIN_LOCK(errno);
+        }
+
+        // - check and fill cache
+        if( ! VERSION_IS_CACHED(ver) ){
+          const void *raw = this->m_pLog->getEntry(ver);
+          this->m_aCache[VERSION_HASH(ver)].obj.reset();
+          this->m_aCache[VERSION_HASH(ver)].obj = 
+            std::make_shared<ObjectType>(*ObjectType::deserialize(raw));
+        }
+
+        // - read from persistent log
+        pObj = GET_CACHED_OBJ_PTR(ver);
+
+        // - unlock
+        if (pthread_spin_unlock(&this->m_aCache[VERSION_HASH(ver)].lck) != 0) {
+          throw PERSIST_EXP_SPIN_UNLOCK(errno);
+        }
+
+        return pObj;
       };
 
       // set value: this increases the version number by 1.
       virtual void set(const ObjectType &v) noexcept(false){
-        //TODO: get the specified version
-        throw PERSIST_EXP_UNIMPLEMENTED;
+        uint64_t size;
+        void * pdata = ObjectType::serialize(v,&size);
+        this->m_pLog->append(pdata,size);
+        free(pdata);
       };
 
 #ifdef HLC_ENABLED
@@ -98,6 +172,13 @@ namespace ns_persistent {
   private:
       // PersistLog
       PersistLog * m_pLog;
+
+      // Version Cache
+      struct {
+        std::shared_ptr<ObjectType>     obj;
+        int64_t                         ver;
+        pthread_spinlock_t              lck;
+      } m_aCache[MAX_NUM_CACHED_VERSION];
   };
 
 }

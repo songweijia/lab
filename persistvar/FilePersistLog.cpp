@@ -209,6 +209,7 @@ namespace ns_persistent{
     return LOG_ENTRY_DATA(LOG_ENTRY_ARRAY + ridx);
   }
 
+  /*** -  deprecated
   const void * FilePersistLog::getEntry()
   noexcept(false) {
     void * ent = NULL;
@@ -221,6 +222,7 @@ namespace ns_persistent{
 
     return ent;
   }
+  ***/
 
   //////////////////////////
   // invisible to outside //

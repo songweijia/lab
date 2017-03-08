@@ -37,8 +37,8 @@ namespace ns_persistent {
     virtual uint64_t getLength() noexcept(false) = 0;
     // Get a version specified entry
     virtual const void* getEntry(int64_t eno) noexcept(false) = 0;
-    // Get the latest version
-    virtual const void* getEntry() noexcept(false) = 0;
+    // Get the latest version - deprecated.
+    // virtual const void* getEntry() noexcept(false) = 0;
   };
 }
 
