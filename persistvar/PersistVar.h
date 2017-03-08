@@ -113,6 +113,11 @@ namespace ns_persistent {
         return this->get(ver);
       };
 
+      // get number of the versions
+      virtual uint64_t getNumOfVersions() noexcept(false) {
+        return this->m_pLog->getLength();
+      };
+
       // get the value defined by version
       // version number >= 0
       // negtive number means how many versions we go back from the latest
