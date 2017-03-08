@@ -43,7 +43,7 @@ int main(int argc,char ** argv){
       cout<<"["<<nv<<"]\t"<<tstx.get(nv)->x<<endl;
   } 
   else if (strcmp(argv[1],"get") == 0){
-    uint64_t nv = atol(argv[2]);
+    int64_t nv = atol(argv[2]);
     cout<<"["<<nv<<"]\t"<<tstx.get(nv)->x<<endl;
   }
   else if (strcmp(argv[1],"set") == 0){

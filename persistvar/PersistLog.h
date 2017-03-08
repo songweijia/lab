@@ -34,7 +34,7 @@ namespace ns_persistent {
     // Persistent Append
     virtual void append(const void * pdata, uint64_t size) noexcept(false) = 0;
     // Get length of the log 
-    virtual uint64_t getLength() noexcept(false) = 0;
+    virtual int64_t getLength() noexcept(false) = 0;
     // Get a version specified entry
     virtual const void* getEntry(int64_t eno) noexcept(false) = 0;
     // Get the latest version - deprecated.

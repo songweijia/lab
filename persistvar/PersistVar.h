@@ -114,7 +114,7 @@ namespace ns_persistent {
       };
 
       // get number of the versions
-      virtual uint64_t getNumOfVersions() noexcept(false) {
+      virtual int64_t getNumOfVersions() noexcept(false) {
         return this->m_pLog->getLength();
       };
 

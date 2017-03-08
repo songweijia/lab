@@ -185,11 +185,11 @@ namespace ns_persistent{
     FPL_UNLOCK;
   }
 
-  uint64_t FilePersistLog::getLength()
+  int64_t FilePersistLog::getLength()
   noexcept(false) {
 
     FPL_RDLOCK;
-    uint64_t len = META_HEADER->fields.eno;
+    int64_t len = META_HEADER->fields.eno;
     FPL_UNLOCK;
 
     return len;
