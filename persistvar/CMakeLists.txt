@@ -27,4 +27,4 @@ add_library(persistvar PersistVar.h PersistLog.cpp PersistLog.h FilePersistLog.c
 output_directory(persistvar target/usr/local/lib)
 
 add_executable(tst tst.cpp)
-target_link_libraries(tst persistvar)
+target_link_libraries(tst persistvar pthread)

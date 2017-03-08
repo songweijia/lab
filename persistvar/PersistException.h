@@ -1,13 +1,29 @@
 #ifndef PERSISTENT_EXCEPTION_H
 #define PERSISTENT_EXCEPTION_H
 
+#include <inttypes.h>
+
 namespace ns_persistent{
   // Exceptions definition
   #define PERSIST_EXP(errcode,usercode) \
     ((((errcode)&0xffffffffull)<<32)|((usercode)&0xffffffffull))
+  #define PERSIST_EXP_USERCODE(x) ((uint32_t)((x)&0xffffffffull))
   #define PERSIST_EXP_UNIMPLEMENTED                     PERSIST_EXP(0,0)
   #define PERSIST_EXP_NEW_FAILED_UNKNOWN                PERSIST_EXP(1,0)
   #define PERSIST_EXP_STORAGE_TYPE_UNKNOWN(x)           PERSIST_EXP(2,(x))
+  #define PERSIST_EXP_OPEN_FILE(x)                      PERSIST_EXP(3,(x))
+  #define PERSIST_EXP_MMAP_FILE(x)                      PERSIST_EXP(4,(x))
+  #define PERSIST_EXP_INV_PATH                          PERSIST_EXP(5,0)
+  #define PERSIST_EXP_CREATE_PATH(x)                    PERSIST_EXP(6,(x))
+  #define PERSIST_EXP_INV_FILE                          PERSIST_EXP(7,0)
+  #define PERSIST_EXP_CREATE_FILE(x)                    PERSIST_EXP(8,(x))
+  #define PERSIST_EXP_TRUNCATE_FILE(x)                  PERSIST_EXP(9,(x))
+  #define PERSIST_EXP_RWLOCK_INIT(x)                    PERSIST_EXP(10,(x))
+  #define PERSIST_EXP_RWLOCK_RDLOCK(x)                  PERSIST_EXP(11,(x))
+  #define PERSIST_EXP_RWLOCK_WRLOCK(x)                  PERSIST_EXP(12,(x))
+  #define PERSIST_EXP_RWLOCK_UNLOCK(x)                  PERSIST_EXP(13,(x))
+  #define PERSIST_EXP_MSYNC(x)                          PERSIST_EXP(14,(x))
+  #define PERSIST_EXP_INV_ENTRY_IDX(x)                  PERSIST_EXP(15,(x))
 }
 
 #endif//PERSISTENT_EXCEPTION_H

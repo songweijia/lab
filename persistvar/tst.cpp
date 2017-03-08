@@ -6,6 +6,9 @@ using namespace ns_persistent;
 class X {
 public:
   int x;
+  virtual ~X(){
+    cerr<<"X's destructor"<<endl;
+  };
 };
 
 DEFINE_PERSIST_VAR(X,tstx,ST_FILE);

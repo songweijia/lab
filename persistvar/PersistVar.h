@@ -4,6 +4,7 @@
 #include <sys/types.h>
 #include <inttypes.h>
 #include <string>
+#include <iostream>
 #include "PersistException.h"
 #include "PersistLog.h"
 #include "FilePersistLog.h"
@@ -14,7 +15,6 @@ namespace ns_persistent {
 
   extern const string NULL_OBJECT_NAME;
 
-  //TODO
   // #define DEFINE_PERSIST_VAR(_t,_n) DEFINE_PERSIST_VAR(_t,_n,ST_FILE)
   #define DEFINE_PERSIST_VAR(_t,_n,_s) \
     PersistVar<_t, _s> _n(# _n)

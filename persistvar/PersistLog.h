@@ -22,7 +22,7 @@ namespace ns_persistent {
   class PersistLog{
   protected:
     // LogName
-    string name;
+    const string m_sName;
   public:
     // Constructor:
     // Remark: the constructor will check the persistent storage
