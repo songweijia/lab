@@ -55,18 +55,21 @@ namespace ns_persistent {
   //   ST_FILE/ST_MEM/ST_3DXP ... I will start with ST_FILE and extend it to
   //   other persistent Storage.
   template <typename ObjectType,
-    StorageType st=ST_FILE>
+    StorageType storageType=ST_FILE>
   class PersistVar{
   public:
+      // constructor: this will guess the objectname from ObjectType
+      PersistVar<ObjectType,storageType>() noexcept(false): 
+        PersistVar<ObjectType,storageType>(*PersistVar<ObjectType,storageType>::s_oNameMaker.make()){};
       // constructor: this will create a persisted variable. It will be
       // loaded from persistent storage defined by st, if it is already
       // defined there, otherwise a new variable as well as its persistent
       // representation is created.
       // - objectName: name of the given object.
-      PersistVar<ObjectType,st>(const char * objectName) noexcept(false){
+      PersistVar<ObjectType,storageType>(const char * objectName) noexcept(false){
         // Initialize log
         this->m_pLog = NULL;
-        switch(st){
+        switch(storageType){
 
         case ST_FILE:
           this->m_pLog = new FilePersistLog(objectName);
@@ -76,7 +79,7 @@ namespace ns_persistent {
           break;
 
         default:
-          throw PERSIST_EXP_STORAGE_TYPE_UNKNOWN(st);
+          throw PERSIST_EXP_STORAGE_TYPE_UNKNOWN(storageType);
         }
         // Initialize the version cache:
         int i;
@@ -88,7 +91,7 @@ namespace ns_persistent {
         }
       };
       // destructor: release the resources
-      virtual ~PersistVar<ObjectType,st>() noexcept(false){
+      virtual ~PersistVar<ObjectType,storageType>() noexcept(false){
         // destroy the spinlocks
         int i;
         for (i=0;i<MAX_NUM_CACHED_VERSION;i++){
@@ -184,8 +187,50 @@ namespace ns_persistent {
         int64_t                         ver;
         pthread_spinlock_t              lck;
       } m_aCache[MAX_NUM_CACHED_VERSION];
+
+      // Static name guessor
+      static class _NameMaker{
+      public:
+        // Constructor
+        _NameMaker() noexcept(false):
+        m_sObjectTypeName(typeid(ObjectType).name()) {
+          this->m_iCounter = 0;
+          if (pthread_spin_init(&this->m_oLck,PTHREAD_PROCESS_SHARED) != 0) {
+            throw PERSIST_EXP_SPIN_INIT(errno);
+          }
+        }
+
+        // Destructor
+        virtual ~_NameMaker() noexcept(true) {
+          pthread_spin_destroy(&this->m_oLck);
+        }
+
+        // guess a name
+        std::shared_ptr<const char *> make() noexcept(false) {
+          int cnt;
+          if (pthread_spin_lock(&this->m_oLck) != 0) {
+            throw PERSIST_EXP_SPIN_LOCK(errno);
+          }
+          cnt = this->m_iCounter++;
+          if (pthread_spin_unlock(&this->m_oLck) != 0) {
+            throw PERSIST_EXP_SPIN_UNLOCK(errno);
+          }
+          char * buf = (char *)malloc((strlen(this->m_sObjectTypeName)+13)/8*8);
+          sprintf(buf,"%s-%d",this->m_sObjectTypeName,cnt);
+          return std::make_shared<const char *>((const char*)buf);
+        }
+
+      private:
+        int m_iCounter;
+        const char *m_sObjectTypeName;
+        pthread_spinlock_t m_oLck;
+      } s_oNameMaker;
   };
 
+  // How many times the constructor was called.
+  template <typename ObjectType,StorageType storageType>
+    typename PersistVar<ObjectType,storageType>::_NameMaker PersistVar<ObjectType,storageType>::s_oNameMaker;
 }
+
 
 #endif//PERSIST_VAR_H
