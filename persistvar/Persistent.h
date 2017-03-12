@@ -17,7 +17,7 @@ namespace ns_persistent {
 
   // #define DEFINE_PERSIST_VAR(_t,_n) DEFINE_PERSIST_VAR(_t,_n,ST_FILE)
   #define DEFINE_PERSIST_VAR(_t,_n,_s) \
-    PersistVar<_t, _s> _n(# _n)
+    Persistent<_t, _s> _n(# _n)
   #define DECLARE_PERSIST_VAR(_t,_n,_s) \
     extern DEFINE_PERSIST_VAR(_t,_n,_s)
 
@@ -32,11 +32,11 @@ namespace ns_persistent {
   #define VERSION_IS_CACHED(v)  (this->m_aCache[VERSION_HASH(v)].ver == (v))
   #define GET_CACHED_OBJ_PTR(v) (this->m_aCache[VERSION_HASH(v)].obj)
 
-  // PersistVar represents a variable backed up by persistent storage. The
+  // Persistent represents a variable backed up by persistent storage. The
   // backend is PersistLog class. PersistLog handles only raw bytes and this
   // class is repsonsible for converting it back and forth between raw bytes
   // and ObjectType. But, the serialization/deserialization functionality is
-  // actually defined by ObjectType and provided by PersistVar users.
+  // actually defined by ObjectType and provided by Persistent users.
   // - ObjectType: user-defined type of the variable it is required to support
   //   serialization and deserialization as follows:
   //   // serialize
@@ -56,19 +56,19 @@ namespace ns_persistent {
   //   other persistent Storage.
   template <typename ObjectType,
     StorageType storageType=ST_FILE>
-  class PersistVar{
+  class Persistent{
   public:
       // constructor: this will guess the objectname from ObjectType
-      PersistVar<ObjectType,storageType>() noexcept(false): 
-        PersistVar<ObjectType,storageType>(
-          *(PersistVar<ObjectType,storageType>::getNameMaker().make())
+      Persistent<ObjectType,storageType>() noexcept(false): 
+        Persistent<ObjectType,storageType>(
+          *(Persistent<ObjectType,storageType>::getNameMaker().make())
         ){};
       // constructor: this will create a persisted variable. It will be
       // loaded from persistent storage defined by st, if it is already
       // defined there, otherwise a new variable as well as its persistent
       // representation is created.
       // - objectName: name of the given object.
-      PersistVar<ObjectType,storageType>(const char * objectName) noexcept(false){
+      Persistent<ObjectType,storageType>(const char * objectName) noexcept(false){
         // Initialize log
         this->m_pLog = NULL;
         switch(storageType){
@@ -93,7 +93,7 @@ namespace ns_persistent {
         }
       };
       // destructor: release the resources
-      virtual ~PersistVar<ObjectType,storageType>() noexcept(false){
+      virtual ~Persistent<ObjectType,storageType>() noexcept(false){
         // destroy the spinlocks
         int i;
         for (i=0;i<MAX_NUM_CACHED_VERSION;i++){
@@ -234,14 +234,14 @@ namespace ns_persistent {
 
   // How many times the constructor was called.
   template <typename ObjectType, StorageType storageType>
-  typename PersistVar<ObjectType,storageType>::_NameMaker & 
-    PersistVar<ObjectType,storageType>::getNameMaker() noexcept(false) {
-    static PersistVar<ObjectType,storageType>::_NameMaker nameMaker;
+  typename Persistent<ObjectType,storageType>::_NameMaker & 
+    Persistent<ObjectType,storageType>::getNameMaker() noexcept(false) {
+    static Persistent<ObjectType,storageType>::_NameMaker nameMaker;
     return nameMaker;
   }
   /* use a static method instead
   template <typename ObjectType,StorageType storageType>
-    typename PersistVar<ObjectType,storageType>::_NameMaker PersistVar<ObjectType,storageType>::s_oNameMaker;
+    typename Persistent<ObjectType,storageType>::_NameMaker Persistent<ObjectType,storageType>::s_oNameMaker;
   */
 }
 

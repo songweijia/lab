@@ -1,7 +1,7 @@
 #include <iostream>
 #include <stdlib.h>
 #include <string.h>
-#include "PersistVar.h"
+#include "Persistent.h"
 
 using namespace ns_persistent;
 
@@ -30,9 +30,9 @@ static void printhelp(){
 }
 
 
-PersistVar<X> px1;
-PersistVar<X> px2; //unused
-PersistVar<X> pxarr[3]; //unused
+Persistent<X> px1;
+Persistent<X> px2; //unused
+Persistent<X> pxarr[3]; //unused
 
 int main(int argc,char ** argv){
   //DEFINE_PERSIST_VAR(X,tstx,ST_FILE);
