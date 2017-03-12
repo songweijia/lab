@@ -29,11 +29,13 @@ static void printhelp(){
   cout << "\tlist" << endl;
 }
 
+
+PersistVar<X> px1;
+PersistVar<X> px2; //unused
+PersistVar<X> pxarr[3]; //unused
+
 int main(int argc,char ** argv){
   //DEFINE_PERSIST_VAR(X,tstx,ST_FILE);
-  PersistVar<X> px1;
-  PersistVar<X> px2; //unused
-  PersistVar<X> pxarr[3]; //unused
 
 
   if(argc <2){

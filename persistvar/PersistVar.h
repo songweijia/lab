@@ -60,7 +60,9 @@ namespace ns_persistent {
   public:
       // constructor: this will guess the objectname from ObjectType
       PersistVar<ObjectType,storageType>() noexcept(false): 
-        PersistVar<ObjectType,storageType>(*PersistVar<ObjectType,storageType>::s_oNameMaker.make()){};
+        PersistVar<ObjectType,storageType>(
+          *(PersistVar<ObjectType,storageType>::getNameMaker().make())
+        ){};
       // constructor: this will create a persisted variable. It will be
       // loaded from persistent storage defined by st, if it is already
       // defined there, otherwise a new variable as well as its persistent
@@ -177,19 +179,8 @@ namespace ns_persistent {
 
 #endif//HLC_ENABLED
 
-  private:
-      // PersistLog
-      PersistLog * m_pLog;
-
-      // Version Cache
-      struct {
-        std::shared_ptr<ObjectType>     obj;
-        int64_t                         ver;
-        pthread_spinlock_t              lck;
-      } m_aCache[MAX_NUM_CACHED_VERSION];
-
-      // Static name guessor
-      static class _NameMaker{
+      // internal _NameMaker class
+      class _NameMaker{
       public:
         // Constructor
         _NameMaker() noexcept(false):
@@ -224,12 +215,34 @@ namespace ns_persistent {
         int m_iCounter;
         const char *m_sObjectTypeName;
         pthread_spinlock_t m_oLck;
-      } s_oNameMaker;
+      };
+
+  private:
+      // PersistLog
+      PersistLog * m_pLog;
+
+      // Version Cache
+      struct {
+        std::shared_ptr<ObjectType>     obj;
+        int64_t                         ver;
+        pthread_spinlock_t              lck;
+      } m_aCache[MAX_NUM_CACHED_VERSION];
+
+     // get the static name maker.
+      static _NameMaker & getNameMaker();
   };
 
   // How many times the constructor was called.
+  template <typename ObjectType, StorageType storageType>
+  typename PersistVar<ObjectType,storageType>::_NameMaker & 
+    PersistVar<ObjectType,storageType>::getNameMaker() noexcept(false) {
+    static PersistVar<ObjectType,storageType>::_NameMaker nameMaker;
+    return nameMaker;
+  }
+  /* use a static method instead
   template <typename ObjectType,StorageType storageType>
     typename PersistVar<ObjectType,storageType>::_NameMaker PersistVar<ObjectType,storageType>::s_oNameMaker;
+  */
 }
 
 
