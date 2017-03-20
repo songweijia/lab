@@ -243,6 +243,18 @@ namespace ns_persistent {
   template <typename ObjectType,StorageType storageType>
     typename Persistent<ObjectType,storageType>::_NameMaker Persistent<ObjectType,storageType>::s_oNameMaker;
   */
+
+  template <typename ObjectType>
+  class Volatile: public Persistent<ObjectType,ST_MEM>{
+    // constructor: this will guess the objectname form ObjectType
+    Volatile<ObjectType>() noexcept(false):
+      Persistent<ObjectType,ST_MEM>(){
+    };
+    // destructor:
+    virtual ~Volatile() noexcept(false){
+      // do nothing
+    };
+  };
 }
 
 
