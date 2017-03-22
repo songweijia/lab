@@ -13,8 +13,6 @@
 
 namespace ns_persistent {
 
-  extern const string NULL_OBJECT_NAME;
-
   // #define DEFINE_PERSIST_VAR(_t,_n) DEFINE_PERSIST_VAR(_t,_n,ST_FILE)
   #define DEFINE_PERSIST_VAR(_t,_n,_s) \
     Persistent<_t, _s> _n(# _n)
