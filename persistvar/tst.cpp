@@ -8,6 +8,7 @@ using namespace ns_persistent;
 class X {
 public:
   int x;
+  /*deprecated
   static void* serialize(const X &x, uint64_t *psize){
     int *buf = (int*)malloc(4);
     *psize = 4;
@@ -19,6 +20,7 @@ public:
     x->x = *(int*)pdata;
     return x;
   }
+  */
 };
 
 
@@ -44,14 +46,18 @@ int main(int argc,char ** argv){
   }
 
   if (strcmp(argv[1],"list") == 0) {
-    uint64_t nv = px1.getNumOfVersions();
+    int64_t nv = px1.getNumOfVersions();
     cout<<"Number of Versions:\t"<<nv<<endl;
-    while(nv-- > 0)
-      cout<<"["<<nv<<"]\t"<<px1.get(nv)->x<<endl;
+    while(nv-- > 0){
+//      px1.getByLambda(nv,[&](X& x){cout<<"["<<nv<<"]\t"<<x.x<<"\t//by lambda"<<endl;});
+      px1.get(nv,[&](X& x){cout<<"["<<nv<<"]\t"<<x.x<<"\t//by lambda"<<endl;});
+      cout<<"["<<nv<<"]\t"<<px1.get(nv)->x<<"\t//by copy"<<endl;
+    }
   } 
   else if (strcmp(argv[1],"get") == 0){
     int64_t nv = atol(argv[2]);
-    cout<<"["<<nv<<"]\t"<<px1.get(nv)->x<<endl;
+    px1.get(nv,[&](X& x){cout<<"["<<nv<<"]\t"<<x.x<<"\t//by lambda"<<endl;});
+    cout<<"["<<nv<<"]\t"<<px1.get(nv)->x<<"\t//by copy"<<endl;
   }
   else if (strcmp(argv[1],"set") == 0){
     int v = atoi(argv[2]);
