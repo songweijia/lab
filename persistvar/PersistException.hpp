@@ -1,5 +1,5 @@
-#ifndef PERSISTENT_EXCEPTION_H
-#define PERSISTENT_EXCEPTION_H
+#ifndef PERSISTENT_EXCEPTION_HPP
+#define PERSISTENT_EXCEPTION_HPP
 
 #include <inttypes.h>
 
@@ -32,4 +32,4 @@ namespace ns_persistent{
   #define PERSIST_EXP_ALLOC(x)                          PERSIST_EXP(21,(x))
 }
 
-#endif//PERSISTENT_EXCEPTION_H
+#endif//PERSISTENT_EXCEPTION_HPP

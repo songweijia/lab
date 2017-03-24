@@ -1,11 +1,11 @@
-#ifndef PERSIST_LOG_H
-#define	PERSIST_LOG_H
+#ifndef PERSIST_LOG_HPP
+#define	PERSIST_LOG_HPP
 
 #include <stdio.h>
 #include <inttypes.h>
 #include <map>
 #include <string>
-#include "PersistException.h"
+#include "PersistException.hpp"
 
 using namespace std;
 
@@ -42,4 +42,4 @@ namespace ns_persistent {
   };
 }
 
-#endif
+#endif//PERSIST_LOG_HPP

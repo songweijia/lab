@@ -5,7 +5,7 @@
 #include <unistd.h>
 #include <string.h>
 #include <iostream>
-#include "MemLog.h"
+#include "MemLog.hpp"
 
 using namespace std;
 

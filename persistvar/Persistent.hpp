@@ -1,5 +1,5 @@
-#ifndef PERSIST_VAR_H
-#define PERSIST_VAR_H
+#ifndef PERSISTENT_HPP
+#define PERSISTENT_HPP
 
 #include <sys/types.h>
 #include <inttypes.h>
@@ -7,10 +7,10 @@
 #include <iostream>
 #include <memory>
 #include <pthread.h>
-#include "PersistException.h"
-#include "PersistLog.h"
-#include "FilePersistLog.h"
-#include "MemLog.h"
+#include "PersistException.hpp"
+#include "PersistLog.hpp"
+#include "FilePersistLog.hpp"
+#include "MemLog.hpp"
 #include "SerializationSupport.hpp"
 
 using namespace mutils;

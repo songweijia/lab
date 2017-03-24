@@ -1,8 +1,8 @@
-#ifndef MEM_LOG_H
-#define MEM_LOG_H
+#ifndef MEM_LOG_HPP
+#define MEM_LOG_HPP
 
 #include <pthread.h>
-#include "PersistLog.h"
+#include "PersistLog.hpp"
 
 namespace ns_persistent {
 
@@ -29,4 +29,4 @@ namespace ns_persistent {
   };
 }
 
-#endif//MEM_LOG_H
+#endif//MEM_LOG_HPP

@@ -1,8 +1,8 @@
-#ifndef FILE_PERSIST_LOG
-#define FILE_PERSIST_LOG
+#ifndef FILE_PERSIST_LOG_HPP
+#define FILE_PERSIST_LOG_HPP
 
 #include <pthread.h>
-#include "PersistLog.h"
+#include "PersistLog.hpp"
 
 namespace ns_persistent {
 
@@ -50,4 +50,4 @@ namespace ns_persistent {
   };
 }
 
-#endif//FILE_PERSIST_LOG
+#endif//FILE_PERSIST_LOG_HPP

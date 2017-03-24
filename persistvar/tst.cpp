@@ -1,7 +1,7 @@
 #include <iostream>
 #include <stdlib.h>
 #include <string.h>
-#include "Persistent.h"
+#include "Persistent.hpp"
 
 using namespace ns_persistent;
 
