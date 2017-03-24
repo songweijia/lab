@@ -27,7 +27,7 @@ endfunction(output_directory TGT DIR)
 include_directories(dependencies/mutils dependencies/mutils-serialization)
 link_directories(dependencies/mutils dependencies/mutils-serialization)
 
-add_library(persistent Persistent.h PersistLog.cpp PersistLog.h FilePersistLog.cpp FilePersistLog.h)
+add_library(persistent Persistent.h PersistLog.cpp PersistLog.h FilePersistLog.cpp FilePersistLog.h MemLog.cpp MemLog.h)
 output_directory(persistent target/usr/local/lib)
 
 add_executable(tst tst.cpp)

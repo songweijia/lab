@@ -10,6 +10,7 @@
 #include "PersistException.h"
 #include "PersistLog.h"
 #include "FilePersistLog.h"
+#include "MemLog.h"
 #include "SerializationSupport.hpp"
 
 using namespace mutils;
@@ -76,8 +77,16 @@ namespace ns_persistent {
         this->m_pLog = NULL;
         switch(storageType){
 
+        // file system
         case ST_FILE:
           this->m_pLog = new FilePersistLog(objectName);
+          if(this->m_pLog == NULL){
+            throw PERSIST_EXP_NEW_FAILED_UNKNOWN;
+          }
+          break;
+        // volatile
+        case ST_MEM:
+          this->m_pLog = new MemLog(objectName);
           if(this->m_pLog == NULL){
             throw PERSIST_EXP_NEW_FAILED_UNKNOWN;
           }

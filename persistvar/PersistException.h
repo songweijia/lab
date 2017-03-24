@@ -29,6 +29,7 @@ namespace ns_persistent{
   #define PERSIST_EXP_SPIN_LOCK(x)                      PERSIST_EXP(18,(x))
   #define PERSIST_EXP_SPIN_UNLOCK(x)                    PERSIST_EXP(19,(x))
   #define PERSIST_EXP_INV_VER(x)                        PERSIST_EXP(20,(x))
+  #define PERSIST_EXP_ALLOC(x)                          PERSIST_EXP(21,(x))
 }
 
 #endif//PERSISTENT_EXCEPTION_H
