@@ -23,9 +23,25 @@ static void printhelp(){
 }
 
 Persistent<X> px1;
-Persistent<X,ST_MEM> px2; //unused
+//Persistent<X,ST_MEM> px2; 
+Volatile<X> px2; 
 Persistent<X> pxarr[3]; //unused
 
+template <typename OT, StorageType st=ST_FILE>
+void listvar(Persistent<OT,st> &var){
+  int64_t nv = var.getNumOfVersions();
+  cout<<"Number of Versions:\t"<<nv<<endl;
+  while(nv-- > 0){
+    // by lambda
+    var.get(nv,
+      [&](OT& x) {
+        cout<<"["<<nv<<"]\t"<<x.to_string()<<"\t//by lambda"<<endl;
+      });
+    // by copy
+    cout<<"["<<nv<<"]\t"<<var.get(nv)->to_string()<<"\t//by copy"<<endl;
+  }
+}
+ 
 int main(int argc,char ** argv){
   //DEFINE_PERSIST_VAR(X,tstx,ST_FILE);
 
@@ -36,17 +52,10 @@ int main(int argc,char ** argv){
 
   try{
     if (strcmp(argv[1],"list") == 0) {
-      int64_t nv = px1.getNumOfVersions();
-      cout<<"Number of Versions:\t"<<nv<<endl;
-      while(nv-- > 0){
-        // by lambda
-        px1.get(nv,
-          [&](X& x) {
-            cout<<"["<<nv<<"]\t"<<x.x<<"\t//by lambda"<<endl;
-          });
-        // by copy
-        cout<<"["<<nv<<"]\t"<<px1.get(nv)->x<<"\t//by copy"<<endl;
-      }
+      cout<<"Persistent<X> px1:"<<endl;
+      listvar<X>(px1);
+      cout<<"Persistent<X,ST_MEM> px2:"<<endl;
+      listvar<X,ST_MEM>(px2);
     } 
     else if (strcmp(argv[1],"get") == 0){
       int64_t nv = atol(argv[2]);
@@ -65,19 +74,21 @@ int main(int argc,char ** argv){
       px1.set(x);
     }
     else if (strcmp(argv[1],"volatile") == 0) {
-  /*
-      int64_t nv = px2.getNumOfVersions();
-      cout<<"Number of Versions:\t"<<nv<<endl;
-      while(nv-- > 0){
-        // by lambda
-        px1.get(nv,
-          [&](X& x) {
-            cout<<"["<<nv<<"]\t"<<x.x<<"\t//by lambda"<<endl;
-          });
-        // by copy
-        cout<<"["<<nv<<"]\t"<<px1.get(nv)->x<<"\t//by copy"<<endl;
-      }
-  */
+      cout<<"loading Persistent<X,ST_MEM> px2"<<endl;
+      listvar<X,ST_MEM>(px2);
+      X x;
+      x.x = 1;
+      px2.set(x);
+      cout<<"after set 1"<<endl;
+      listvar<X,ST_MEM>(px2);
+      x.x = 10;
+      px2.set(x);
+      cout<<"after set 10"<<endl;
+      listvar<X,ST_MEM>(px2);
+      x.x = 100;
+      px2.set(x);
+      cout<<"after set 100"<<endl;
+      listvar<X,ST_MEM>(px2);
     }
     else {
       cout << "unknown command: " << argv[1] << endl;

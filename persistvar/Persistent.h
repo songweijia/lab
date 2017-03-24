@@ -331,6 +331,7 @@ namespace ns_persistent {
 
   template <typename ObjectType>
   class Volatile: public Persistent<ObjectType,ST_MEM>{
+  public:
     // constructor: this will guess the objectname form ObjectType
     Volatile<ObjectType>() noexcept(false):
       Persistent<ObjectType,ST_MEM>(){
