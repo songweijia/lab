@@ -18,25 +18,24 @@ HLC::HLC ()
   this->m_rtc_us = get_rtc_us();
   this->m_logic = 0L;
   if (pthread_spin_init(&this->m_oLck,PTHREAD_PROCESS_SHARED) != 0) {
-    throw HLC_SPINLOCK_INIT(errno);
+    throw HLC_EXP_SPIN_INIT(errno);
   }
 }
 
 HLC::~HLC ()
   noexcept(false) {
   if (pthread_spin_destroy(&this->m_oLck) != 0) {
-    throw HLC_SPINLOCK_DESTROY(errno);
+    throw HLC_EXP_SPIN_DESTROY(errno);
   }
 }
 
-// TODO:READ/WRITE LOCK????
 #define HLC_LOCK \
   if (pthread_spin_lock(&this->m_oLck) != 0) { \
-    throw HLC_SPINLOCK_LOCK(errno); \
+    throw HLC_EXP_SPIN_LOCK(errno); \
   }
 #define HLC_UNLOCK \
   if (pthread_spin_unlock(&this->m_oLck) != 0) { \
-    throw HLC_SPINLOCK_UNLOCK(errno); \
+    throw HLC_EXP_SPIN_UNLOCK(errno); \
   }
 
 void HLC::tick ()
@@ -44,7 +43,7 @@ void HLC::tick ()
   HLC_LOCK
   
   uint64_t rtc = get_rtc_us();
-  if ( rtc == this->m_rtc_us ) {
+  if ( rtc <= this->m_rtc_us ) {
     this->m_logic ++;
   } else {
     this->m_rtc_us = rtc;
@@ -52,4 +51,58 @@ void HLC::tick ()
   }
 
   HLC_UNLOCK
+}
+
+void HLC::tick (const HLC & msgHlc)
+  noexcept(false) {
+  HLC_LOCK
+
+  uint64_t rtc = get_rtc_us();
+
+  if (rtc > this->m_rtc_us && rtc > msgHlc.m_rtc_us) {
+    // use rtc
+    this->m_rtc_us = rtc;
+    this->m_logic = 0ull;
+  } else if (*this >= msgHlc) {
+    // use this hlc
+    this->m_logic ++;
+  } else {
+    // use msg hlc
+    this->m_rtc_us = msgHlc.m_rtc_us;
+    this->m_logic = msgHlc.m_logic + 1;
+  }
+
+  HLC_UNLOCK
+}
+
+bool HLC::operator > (const HLC & hlc) const
+  noexcept(true) {
+  return (this->m_rtc_us > hlc.m_rtc_us) ||
+    (this->m_rtc_us == hlc.m_rtc_us && this->m_logic > hlc.m_logic);
+}
+
+bool HLC::operator < (const HLC & hlc) const
+  noexcept(true) {
+  return hlc > *this || hlc == *this;
+}
+
+bool HLC::operator == (const HLC & hlc) const
+  noexcept(true) {
+  return this->m_rtc_us == hlc.m_rtc_us && this->m_logic == hlc.m_logic;
+}
+
+bool HLC::operator >= (const HLC &hlc) const
+  noexcept(true) {
+  return  ! (hlc > *this);
+}
+
+bool HLC::operator <= (const HLC &hlc) const
+  noexcept(true) {
+  return ! (*this > hlc);
+}
+
+void HLC::operator = (const HLC &hlc)
+  noexcept(true) {
+  this->m_rtc_us = hlc.m_rtc_us;
+  this->m_logic = hlc.m_logic;
 }
