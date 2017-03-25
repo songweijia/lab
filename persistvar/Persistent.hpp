@@ -179,6 +179,12 @@ namespace ns_persistent {
         return from_bytes<ObjectType>(dm,(char const *)this->m_pLog->getEntry(ver));      
       };
 
+      // syntax sugar: get the specified version of T without DSM
+      std::unique_ptr<ObjectType> operator [](int64_t version)
+        noexcept(false) {
+        return this->get(version);
+      }
+
       /* deprecated
       // get the latest Value of T
       // virtual std::shared_ptr<ObjectType> get() noexcept(false)
