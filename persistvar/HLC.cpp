@@ -58,8 +58,7 @@ void HLC::tick (const HLC & msgHlc)
   HLC_LOCK
 
   uint64_t rtc = get_rtc_us();
-
-  if (rtc > this->m_rtc_us && rtc > msgHlc.m_rtc_us) {
+  if ((rtc > this->m_rtc_us) && (rtc > msgHlc.m_rtc_us)) {
     // use rtc
     this->m_rtc_us = rtc;
     this->m_logic = 0ull;
@@ -83,7 +82,7 @@ bool HLC::operator > (const HLC & hlc) const
 
 bool HLC::operator < (const HLC & hlc) const
   noexcept(true) {
-  return hlc > *this || hlc == *this;
+  return hlc > *this && !(hlc == *this);
 }
 
 bool HLC::operator == (const HLC & hlc) const

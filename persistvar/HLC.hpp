@@ -1,6 +1,6 @@
 #ifndef HLC_HPP
 #define HLC_HPP
-
+#include <sys/types.h>
 #include <inttypes.h>
 #include <pthread.h>
 
@@ -13,7 +13,7 @@ public:
   uint64_t m_rtc_us; // real-time clock in microseconds
   uint64_t m_logic;  // logic clock
   // constructors
-  HLC () noexcept(false); 
+  HLC () noexcept(false);
 
   // destructors
   virtual ~HLC() noexcept(false);
