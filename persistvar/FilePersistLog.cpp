@@ -52,16 +52,16 @@ namespace ns_persistent{
 
   void FilePersistLog::load()
   noexcept(false){
-    dbg_info("{0}:load state...begin",this->m_sName);
+    dbg_trace("{0}:load state...begin",this->m_sName);
     // STEP 0: check if data path exists
     checkOrCreateDir(this->m_sDataPath);
-    dbg_info("{0}:checkOrCreateDir passed.",this->m_sName);
+    dbg_trace("{0}:checkOrCreateDir passed.",this->m_sName);
     // STEP 1: get file name
     const string metaFile = this->m_sDataPath + "/" + this->m_sName + "." + METAFILE_SUFFIX;
     const string dataFile = this->m_sDataPath + "/" + this->m_sName + "." + DATAFILE_SUFFIX;
     bool bCreate = checkOrCreateMetaFile(metaFile);
     checkOrCreateDataFile(dataFile);
-    dbg_info("{0}:checkOrCreateDataFile passed.",this->m_sName);
+    dbg_trace("{0}:checkOrCreateDataFile passed.",this->m_sName);
     // STEP 2: open files
     this->m_iMetaFileDesc = open(metaFile.c_str(),O_RDWR);
     if (this->m_iMetaFileDesc == -1) {
@@ -80,7 +80,7 @@ namespace ns_persistent{
     if (this->m_pData == MAP_FAILED) {
       throw PERSIST_EXP_MMAP_FILE(errno);
     }
-    dbg_info("{0}:data/meta file mapped to memory",this->m_sName);
+    dbg_trace("{0}:data/meta file mapped to memory",this->m_sName);
     // STEP 4: initialize the header for new created Metafile
     if (bCreate) {
       MetaHeader *pmh = (MetaHeader *)this->m_pMeta;
@@ -102,7 +102,7 @@ namespace ns_persistent{
         this->m_hlcLE.m_logic = CURR_LOG_ENTRY->fields.hlc_l;
       }
     }
-    dbg_info("{0}:load state...done",this->m_sName);
+    dbg_trace("{0}:load state...done",this->m_sName);
   }
 
   FilePersistLog::~FilePersistLog()
@@ -126,6 +126,7 @@ namespace ns_persistent{
 
   void FilePersistLog::append(const void *pdat, uint64_t size, const HLC & mhlc)
   noexcept(false) {
+    dbg_trace("{0} append event ({1},{2})",this->m_sName, mhlc.m_rtc_us, mhlc.m_logic);
     ML_WRLOCK;
 
     // copy and flush data
@@ -155,7 +156,8 @@ namespace ns_persistent{
       ML_UNLOCK;
       throw PERSIST_EXP_MSYNC(errno);
     }
-    
+
+    dbg_trace("{0} append log ({1},{2})",this->m_sName, this->m_hlcLE.m_rtc_us, this->m_hlcLE.m_logic);
     ML_UNLOCK;
   }
 

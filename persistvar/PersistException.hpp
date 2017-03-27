@@ -31,6 +31,7 @@ namespace ns_persistent{
   #define PERSIST_EXP_INV_VER(x)                        PERSIST_EXP(20,(x))
   #define PERSIST_EXP_ALLOC(x)                          PERSIST_EXP(21,(x))
   #define PERSIST_EXP_READ_FUTURE                       PERSIST_EXP(22,0)
+  #define PERSIST_EXP_INV_HLC                           PERSIST_EXP(23,0)
 }
 
 #endif//PERSISTENT_EXCEPTION_HPP

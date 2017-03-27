@@ -1,6 +1,7 @@
 #include <iostream>
 #include <stdlib.h>
 #include <string.h>
+#include <spdlog/spdlog.h>
 #include "Persistent.hpp"
 #include "HLC.hpp"
 
@@ -14,14 +15,14 @@ public:
   }
 };
 
-
 static void printhelp(){
   cout << "usage:" << endl;
   cout << "\tget <version>" << endl;
+  cout << "\tgetbytime <timestamp>" << endl;
   cout << "\tset value" << endl;
   cout << "\tlist" << endl;
   cout << "\tvolatile" << endl;
-  cout << "\thlc"<<endl;
+  cout << "\thlc"<< endl;
 }
 
 Persistent<X> px1;
@@ -47,6 +48,7 @@ void listvar(Persistent<OT,st> &var){
 static void test_hlc();
  
 int main(int argc,char ** argv){
+  spdlog::set_level(spdlog::level::trace);
   //DEFINE_PERSIST_VAR(X,tstx,ST_FILE);
 
   if(argc <2){
@@ -70,6 +72,15 @@ int main(int argc,char ** argv){
         });
       // by copy
       cout<<"["<<nv<<"]\t"<<px1.get(nv)->x<<"\t//by copy"<<endl;
+    }
+    else if (strcmp(argv[1],"getbytime") == 0){
+      HLC hlc;
+      hlc.m_rtc_us = atol(argv[2]);
+      hlc.m_logic = 0;
+      px1.get(hlc,
+        [&](X& x) {
+          cout<<"[("<<hlc.m_rtc_us<<",0)]\t"<<x.x<<"\t//bylambda"<<endl;
+        });
     }
     else if (strcmp(argv[1],"set") == 0) {
       int v = atoi(argv[2]);
@@ -101,7 +112,7 @@ int main(int argc,char ** argv){
       cout << "unknown command: " << argv[1] << endl;
       printhelp();
     }
-  }catch (uint64_t exp){
+  }catch (unsigned long long exp){
     cerr<<"Exception captured:0x"<<std::hex<<exp<<endl;
   }
 

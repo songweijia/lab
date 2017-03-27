@@ -96,28 +96,9 @@ namespace ns_persistent {
         default:
           throw PERSIST_EXP_STORAGE_TYPE_UNKNOWN(storageType);
         }
-
-        /* deprecated
-        // Initialize the version cache:
-        int i;
-        for (i=0;i<MAX_NUM_CACHED_VERSION;i++){
-          this->m_aCache[i].ver = INVALID_VERSION;
-          if (pthread_spin_init(&this->m_aCache[i].lck,PTHREAD_PROCESS_SHARED) != 0) {
-            throw PERSIST_EXP_SPIN_INIT(errno);
-          }
-        }
-        */
       };
       // destructor: release the resources
       virtual ~Persistent<ObjectType,storageType>() noexcept(false){
-        /* deprecated
-        // destroy the spinlocks
-        int i;
-        for (i=0;i<MAX_NUM_CACHED_VERSION;i++){
-          pthread_spin_destroy(&this->m_aCache[i].lck);
-        }
-        */
-
         // destroy the in-memory log
         if(this->m_pLog != NULL){
           delete this->m_pLog;
@@ -132,7 +113,6 @@ namespace ns_persistent {
         const Func& fun, 
         DeserializationManager *dm=nullptr)
         noexcept(false) {
-        // return this->getByLambda(-1,fun,dm);
         return this->get(-1L,fun,dm);
       };
 
@@ -173,7 +153,11 @@ namespace ns_persistent {
         const Func& fun,
         DeserializationManager *dm=nullptr)
         noexcept(false) {
-        return deserialize_and_run<ObjectType>(dm,(char *)this->m_pLog->getEntry(hlc),fun);
+        char * pdat = (char*)this->m_pLog->getEntry(hlc);
+        if (pdat == nullptr) {
+          throw PERSIST_EXP_INV_HLC;
+        }
+        return deserialize_and_run<ObjectType>(dm,pdat,fun);
       };
 
       // get a version of value T. returns a unique pointer to the object
@@ -198,7 +182,12 @@ namespace ns_persistent {
         const HLC& hlc,
         DeserializationManager *dm=nullptr)
         noexcept(false) {
-          //TODO:
+        char const * pdat = (char const *)this->m_pLog->getEntry(hlc);
+        if (pdat == nullptr) {
+          throw PERSIST_EXP_INV_HLC;
+        }
+
+        return from_bytes<ObjectType>(dm,pdat);
       }
 
       // syntax sugar: get a specified version of T without DSM
@@ -276,15 +265,6 @@ namespace ns_persistent {
   private:
       // PersistLog
       PersistLog * m_pLog;
-
-      /* deprecated
-      // Version Cache
-      struct {
-        std::shared_ptr<ObjectType>     obj;
-        int64_t                         ver;
-        pthread_spinlock_t              lck;
-      } m_aCache[MAX_NUM_CACHED_VERSION];
-      */
 
       // get the static name maker.
       static _NameMaker & getNameMaker();

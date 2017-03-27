@@ -5,7 +5,7 @@
 #include <unistd.h>
 #include <string.h>
 #include <iostream>
-#include <spdlog/spdlog.h>
+#include "util.hpp"
 #include "MemLog.hpp"
 
 using namespace std;
@@ -50,8 +50,8 @@ namespace ns_persistent{
 
   void MemLog::append (const void *pdat, uint64_t size, const HLC &mhlc)
   noexcept(false) {
+    dbg_trace("{0} append event ({1},{2})",this->m_sName, mhlc.m_rtc_us, mhlc.m_logic);
     ML_WRLOCK;
-
     // copy data
     memcpy(NEXT_DATA,pdat,size);
 
@@ -67,6 +67,7 @@ namespace ns_persistent{
     META_HEADER->fields.eno ++;
     META_HEADER->fields.ofst += size;
     
+    dbg_trace("{0} append log ({1},{2})",this->m_sName, this->m_hlcLE.m_rtc_us, this->m_hlcLE.m_logic);
     ML_UNLOCK;
   }
 
@@ -91,17 +92,22 @@ namespace ns_persistent{
     int64_t ridx = (eidx < 0)?((int64_t)META_HEADER->fields.eno + eidx):eidx;
     ML_UNLOCK;
 
+    dbg_trace("{0} getEntry at ({1},{2})",this->m_sName,(LOG_ENTRY_ARRAY + ridx)->fields.hlc_r,(LOG_ENTRY_ARRAY + ridx)->fields.hlc_l);
+
     return LOG_ENTRY_DATA(LOG_ENTRY_ARRAY + ridx);
   }
 
   // find the log entry by HLC timestmap:rhlc
   static LogEntry * binarySearch(const HLC &rhlc, LogEntry *logArr, int64_t len) {
     if (len <= 0) {
+      dbg_trace("binary Search failed...EMPTY LOG");
       return nullptr;
     }
     int64_t head = 0, tail = len - 1;
-    int64_t pivot = len/2;
+    int64_t pivot = 0;
     while (head <= tail) {
+      pivot = (head + tail)/2;
+      dbg_trace("Search range: {0}->[{1},{2}]",pivot,head,tail);
       if ((logArr+pivot)->fields.hlc_r == rhlc.m_rtc_us && 
         (logArr+pivot)->fields.hlc_l == rhlc.m_logic){
         break; // found
@@ -120,6 +126,7 @@ namespace ns_persistent{
       } else { // search left
         tail = pivot - 1;
         if (head > tail) {
+          dbg_trace("binary Search failed...Object does not exist.");
           return nullptr;
         }
       }
@@ -151,8 +158,9 @@ namespace ns_persistent{
     }
 
     //binary search
+    dbg_trace("{0} - begin binary search.",this->m_sName);
     ple = binarySearch(rhlc,LOG_ENTRY_ARRAY,META_HEADER->fields.eno);
-
+    dbg_trace("{0} - end binary search.",this->m_sName);
 
     ML_UNLOCK;
 
@@ -160,6 +168,8 @@ namespace ns_persistent{
     if (ple == nullptr){
       return nullptr;
     }
+
+    dbg_trace("{0} getEntry at ({1},{2})",this->m_sName,ple->fields.hlc_r,ple->fields.hlc_l);
 
     return LOG_ENTRY_DATA(ple);
   }
