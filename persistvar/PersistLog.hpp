@@ -6,6 +6,7 @@
 #include <map>
 #include <string>
 #include "PersistException.hpp"
+#include "HLC.hpp"
 
 using namespace std;
 
@@ -32,13 +33,15 @@ namespace ns_persistent {
     PersistLog(const string &name) noexcept(true);
     virtual ~PersistLog() noexcept(true);
     // Persistent Append
-    virtual void append(const void * pdata, uint64_t size) noexcept(false) = 0;
+    virtual void append(const void * pdata, uint64_t size, const HLC & mhlc) noexcept(false) = 0;
     // Get length of the log 
     virtual int64_t getLength() noexcept(false) = 0;
-    // Get a version specified entry
+    // Get a version
     virtual const void* getEntry(int64_t eno) noexcept(false) = 0;
     // Get the latest version - deprecated.
     // virtual const void* getEntry() noexcept(false) = 0;
+    // Get a version specified by hlc
+    virtual const void* getEntry(const HLC & hlc) noexcept(false) = 0;
   };
 }
 

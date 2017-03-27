@@ -3,7 +3,7 @@
 #include "HLC.hpp"
 
 // return microsecond
-static uint64_t get_rtc_us () 
+uint64_t read_rtc_us () 
   noexcept(false) {
   struct timespec tp;
   if ( clock_gettime(CLOCK_REALTIME,&tp) != 0 ) {
@@ -15,7 +15,7 @@ static uint64_t get_rtc_us ()
 
 HLC::HLC () 
   noexcept(false) {
-  this->m_rtc_us = get_rtc_us();
+  this->m_rtc_us = read_rtc_us();
   this->m_logic = 0L;
   if (pthread_spin_init(&this->m_oLck,PTHREAD_PROCESS_SHARED) != 0) {
     throw HLC_EXP_SPIN_INIT(errno);
@@ -42,7 +42,7 @@ void HLC::tick ()
   noexcept(false) {
   HLC_LOCK
   
-  uint64_t rtc = get_rtc_us();
+  uint64_t rtc = read_rtc_us();
   if ( rtc <= this->m_rtc_us ) {
     this->m_logic ++;
   } else {
@@ -57,7 +57,7 @@ void HLC::tick (const HLC & msgHlc)
   noexcept(false) {
   HLC_LOCK
 
-  uint64_t rtc = get_rtc_us();
+  uint64_t rtc = read_rtc_us();
   if ((rtc > this->m_rtc_us) && (rtc > msgHlc.m_rtc_us)) {
     // use rtc
     this->m_rtc_us = rtc;

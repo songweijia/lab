@@ -29,7 +29,8 @@ namespace ns_persistent{
     struct {
       uint64_t dlen;    // length of the data
       uint64_t ofst;	// offset of the data
-    };
+      HLC hlc;          // HLC clock of the data
+    } fields;
     uint8_t bytes[32];
   } LogEntry;
 
@@ -37,10 +38,11 @@ namespace ns_persistent{
   #define META_HEADER ((MetaHeader*)this->m_pMeta)
   #define LOG_ENTRY_ARRAY       ((LogEntry*)((uint8_t*)this->m_pMeta + sizeof(MetaHeader)))
   #define NEXT_LOG_ENTRY        (LOG_ENTRY_ARRAY + META_HEADER->fields.eno)
+  #define CURR_LOG_ENTRY        (NEXT_LOG_ENTRY - 1)
   #define NEXT_DATA             ((void *)((uint64_t)this->m_pData + META_HEADER->fields.ofst))
   #define PAGE_SIZE             (getpagesize())
   #define ALIGN_TO_PAGE(x)      ((void *)(((uint64_t)(x))-((uint64_t)(x))%PAGE_SIZE))
-  #define LOG_ENTRY_DATA(e)     ((void *)(((uint64_t)this->m_pData)+(e)->ofst))
+  #define LOG_ENTRY_DATA(e)     ((void *)(((uint64_t)this->m_pData)+(e)->fields.ofst))
 
   // size limit for the meta and data file
   #define METAFILE_SIZE (0x1ull<<30)
@@ -135,6 +137,12 @@ namespace ns_persistent{
       }
       FPL_UNLOCK;
     }
+    // STEP 5: update m_hlcLE with the latest event
+    if (META_HEADER->fields.eno >0) {
+      if (this->m_hlcLE < CURR_LOG_ENTRY->fields.hlc){
+        this->m_hlcLE = CURR_LOG_ENTRY->fields.hlc;
+      }
+    }
   }
 
   FilePersistLog::~FilePersistLog()
@@ -154,7 +162,7 @@ namespace ns_persistent{
     }
   }
 
-  void FilePersistLog::append(const void *pdat, uint64_t size)
+  void FilePersistLog::append(const void *pdat, uint64_t size, const HLC & mhlc)
   noexcept(false) {
     FPL_WRLOCK;
 
@@ -166,8 +174,11 @@ namespace ns_persistent{
     }
 
     // fill and flush log entry
-    NEXT_LOG_ENTRY->dlen = size;
-    NEXT_LOG_ENTRY->ofst = META_HEADER->fields.ofst;
+    NEXT_LOG_ENTRY->fields.dlen = size;
+    NEXT_LOG_ENTRY->fields.ofst = META_HEADER->fields.ofst;
+    NEXT_LOG_ENTRY->fields.hlc = (mhlc > this->m_hlcLE)?mhlc:this->m_hlcLE;
+    NEXT_LOG_ENTRY->fields.hlc.tick();
+    this->m_hlcLE = NEXT_LOG_ENTRY->fields.hlc;
     if (msync(ALIGN_TO_PAGE(NEXT_LOG_ENTRY), 
         sizeof(LogEntry) + (((uint64_t)NEXT_LOG_ENTRY) % PAGE_SIZE),MS_SYNC) != 0) {
       FPL_UNLOCK;
@@ -207,6 +218,70 @@ namespace ns_persistent{
     FPL_UNLOCK;
 
     return LOG_ENTRY_DATA(LOG_ENTRY_ARRAY + ridx);
+  }
+
+  // find the log entry by HLC timestmap:rhlc
+  static LogEntry * binarySearch(const HLC &rhlc, LogEntry *logArr, int64_t len) {
+    if (len <= 0) {
+      return nullptr;
+    }
+    int64_t head = 0, tail = len - 1;
+    int64_t pivot = len/2;
+    while (head <= tail) {
+      if ((logArr+pivot)->fields.hlc == rhlc){
+        break; // found
+      } else if ((logArr+pivot)->fields.hlc < rhlc){
+        if (pivot + 1 >= len) {
+          break; // found
+        } else if ((logArr+pivot)->fields.hlc > rhlc) {
+          break; // found
+        } else { // search right
+          head = pivot + 1;
+        }
+      } else { // search left
+        tail = pivot - 1;
+        if (head > tail) {
+          return nullptr;
+        }
+      }
+    }
+    return logArr + pivot;
+  }
+
+  const void * FilePersistLog::getEntry(const HLC &rhlc)
+  noexcept(false) {
+
+    uint64_t now = read_rtc_us();
+    LogEntry * ple = nullptr;
+
+    FPL_RDLOCK;
+
+    if (this->m_hlcLE < rhlc) {
+      if (now <= rhlc.m_rtc_us) {
+        // read future
+        FPL_UNLOCK;
+        throw PERSIST_EXP_READ_FUTURE;
+      } else {
+        // update m_hlcLE to read clock
+        FPL_UNLOCK;
+        FPL_WRLOCK;
+        this->m_hlcLE = rhlc;
+        FPL_UNLOCK;
+        FPL_RDLOCK;
+      }
+    }
+
+    //binary search
+    ple = binarySearch(rhlc,LOG_ENTRY_ARRAY,META_HEADER->fields.eno);
+
+    FPL_UNLOCK;
+
+    // no object exists before the requested timestamp.
+    if (ple == nullptr){
+      return nullptr;
+    }
+
+    return LOG_ENTRY_DATA(ple);
   }
 
   /*** -  deprecated

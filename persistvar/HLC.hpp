@@ -42,4 +42,7 @@ public:
 #define HLC_EXP_SPIN_LOCK(x)                    HLC_EXP(3,(x))
 #define HLC_EXP_SPIN_UNLOCK(x)                    HLC_EXP(4,(x))
 
+// read the rtc clock in microseconds
+uint64_t read_rtc_us() noexcept(false);
+
 #endif//HLC_HPP

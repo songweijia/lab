@@ -7,6 +7,7 @@
 #include <iostream>
 #include <memory>
 #include <pthread.h>
+#include "HLC.hpp"
 #include "PersistException.hpp"
 #include "PersistLog.hpp"
 #include "FilePersistLog.hpp"
@@ -162,6 +163,19 @@ namespace ns_persistent {
         return deserialize_and_run<ObjectType>(dm,(char *)this->m_pLog->getEntry(ver),fun);
       };
 
+      // get a version of Value T, specified by HLC clock. the user lambda will be fed with
+      // an object of T.
+      // zerocopy: this object will not live once it returns.
+      // return value is decided by the user lambda.
+      template <typename Func>
+      auto get (
+        const HLC& hlc,
+        const Func& fun,
+        DeserializationManager *dm=nullptr)
+        noexcept(false) {
+        return deserialize_and_run<ObjectType>(dm,(char *)this->m_pLog->getEntry(hlc),fun);
+      };
+
       // get a version of value T. returns a unique pointer to the object
       std::unique_ptr<ObjectType> get(
         int64_t version, 
@@ -179,10 +193,24 @@ namespace ns_persistent {
         return from_bytes<ObjectType>(dm,(char const *)this->m_pLog->getEntry(ver));      
       };
 
-      // syntax sugar: get the specified version of T without DSM
+      // get a version of value T. specified by HLC clock.
+      std::unique_ptr<ObjectType> get(
+        const HLC& hlc,
+        DeserializationManager *dm=nullptr)
+        noexcept(false) {
+          //TODO:
+      }
+
+      // syntax sugar: get a specified version of T without DSM
       std::unique_ptr<ObjectType> operator [](int64_t version)
         noexcept(false) {
         return this->get(version);
+      }
+
+      // syntax sugar: get a specified version of T without DSM
+      std::unique_ptr<ObjectType> operator [](const HLC & hlc)
+        noexcept(false) {
+        return this->get(hlc);
       }
 
       /* deprecated
@@ -247,13 +275,21 @@ namespace ns_persistent {
       */
 
       // set value: this increases the version number by 1.
-      virtual void set(const ObjectType &v) noexcept(false){
+      virtual void set(const ObjectType &v, const HLC &mhlc) 
+        noexcept(false) {
         auto size = bytes_size(v);
         char buf[size];
         bzero(buf,size);
         to_bytes(v,buf);
-        this->m_pLog->append((void*)buf,size);
+        this->m_pLog->append((void*)buf,size,mhlc);
       };
+
+      // set value: this incrases the version number by 1.
+      virtual void set(const ObjectType &v)
+        noexcept(false) {
+        HLC mhlc; // generate a default timestamp for it.
+        this->set(v,mhlc);
+      }
 
 #ifdef HLC_ENABLED
 

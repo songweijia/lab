@@ -12,8 +12,11 @@ namespace ns_persistent {
     void * m_pMeta;
     void * m_pData;
 
-    // mutex
+    // read/write lock
     pthread_rwlock_t m_rwlock;
+
+    // HLC clock of the latest event
+    HLC m_hlcLE;
 
   public:
 
@@ -23,9 +26,10 @@ namespace ns_persistent {
     virtual ~MemLog() noexcept(true);
 
     //Derived from PersistLog
-    virtual void append(const void * pdata, uint64_t size) noexcept(false);
+    virtual void append(const void * pdata, uint64_t size, const HLC &hlc) noexcept(false);
     virtual int64_t getLength() noexcept(false);
     virtual const void* getEntry(int64_t eno) noexcept(false);
+    virtual const void* getEntry(const HLC &hlc) noexcept(false);
   };
 }
 
