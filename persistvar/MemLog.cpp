@@ -5,6 +5,7 @@
 #include <unistd.h>
 #include <string.h>
 #include <iostream>
+#include <spdlog/spdlog.h>
 #include "MemLog.hpp"
 
 using namespace std;

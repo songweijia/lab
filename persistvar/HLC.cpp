@@ -38,10 +38,12 @@ HLC::~HLC ()
     throw HLC_EXP_SPIN_UNLOCK(errno); \
   }
 
-void HLC::tick ()
+void HLC::tick (bool thread_safe)
   noexcept(false) {
-  HLC_LOCK
-  
+  if (thread_safe) {
+    HLC_LOCK
+  }
+
   uint64_t rtc = read_rtc_us();
   if ( rtc <= this->m_rtc_us ) {
     this->m_logic ++;
@@ -50,12 +52,16 @@ void HLC::tick ()
     this->m_logic = 0ull;
   }
 
-  HLC_UNLOCK
+  if(thread_safe) {
+    HLC_UNLOCK
+  }
 }
 
-void HLC::tick (const HLC & msgHlc)
+void HLC::tick (const HLC & msgHlc, bool thread_safe)
   noexcept(false) {
-  HLC_LOCK
+  if (thread_safe) {
+    HLC_LOCK
+  }
 
   uint64_t rtc = read_rtc_us();
   if ((rtc > this->m_rtc_us) && (rtc > msgHlc.m_rtc_us)) {
@@ -71,7 +77,9 @@ void HLC::tick (const HLC & msgHlc)
     this->m_logic = msgHlc.m_logic + 1;
   }
 
-  HLC_UNLOCK
+  if (thread_safe) {
+    HLC_UNLOCK
+  }
 }
 
 bool HLC::operator > (const HLC & hlc) const

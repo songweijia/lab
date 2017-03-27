@@ -30,9 +30,19 @@ mv Makefile Makefile.tmp
 cat Makefile.tmp | sed '/^CPPFLAGS/s/$/ -I..\/mutils/' | sed '/^LDFLAGS/s/$/ -L..\/mutils/' > Makefile
 make
 assert_success "making mutils-serialization dependency"
-cd ../..
+cd ..
 
-# STEP 3. build this library
+# STEP 3. pull other dependencies
+git clone https://github.com/gabime/spdlog.git
+assert_success "git clone https://github.com/gabime/spdlog.git"
+cd spdlog
+git checkout 029e6ed40fdbca23c4804189254d226190181b73
+assert_success "git checkout 029e6ed40fdbca23c4804189254d226190181b73"
+cd ..
+
+# leave dependencies
+cd ..
+# STEP 4. build this library
 echo "mkdir ${BUILD}"
 mkdir ${BUILD}
 echo "done mkdir ${BUILD}"

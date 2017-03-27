@@ -19,8 +19,8 @@ public:
   virtual ~HLC() noexcept(false);
 
   // ticking method - thread safe
-  virtual void tick () noexcept(false);
-  virtual void tick (const HLC & msgHlc) noexcept(false);
+  virtual void tick (bool thread_safe=true) noexcept(false);
+  virtual void tick (const HLC & msgHlc, bool thread_safe=true) noexcept(false);
 
   // comparators
   virtual bool operator > (const HLC & hlc) const noexcept(true);

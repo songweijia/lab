@@ -5,6 +5,7 @@
 #include <unistd.h>
 #include <string.h>
 #include <iostream>
+#include "util.hpp"
 #include "FilePersistLog.hpp"
 
 using namespace std;
@@ -51,6 +52,7 @@ namespace ns_persistent{
 
   void FilePersistLog::load()
   noexcept(false){
+    dbg_info("{0}:load state...begin",this->m_sName);
     // STEP 0: check if data path exists
     checkOrCreateDir(this->m_sDataPath);
     // STEP 1: get file name
@@ -94,6 +96,7 @@ namespace ns_persistent{
         this->m_hlcLE = CURR_LOG_ENTRY->fields.hlc;
       }
     }
+    dbg_info("{0}:load state...done",this->m_sName);
   }
 
   FilePersistLog::~FilePersistLog()
@@ -130,7 +133,7 @@ namespace ns_persistent{
     NEXT_LOG_ENTRY->fields.dlen = size;
     NEXT_LOG_ENTRY->fields.ofst = META_HEADER->fields.ofst;
     NEXT_LOG_ENTRY->fields.hlc = (mhlc > this->m_hlcLE)?mhlc:this->m_hlcLE;
-    NEXT_LOG_ENTRY->fields.hlc.tick();
+    NEXT_LOG_ENTRY->fields.hlc.tick(false);
     this->m_hlcLE = NEXT_LOG_ENTRY->fields.hlc;
     if (msync(ALIGN_TO_PAGE(NEXT_LOG_ENTRY), 
         sizeof(LogEntry) + (((uint64_t)NEXT_LOG_ENTRY) % PAGE_SIZE),MS_SYNC) != 0) {
