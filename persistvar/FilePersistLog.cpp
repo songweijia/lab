@@ -55,11 +55,13 @@ namespace ns_persistent{
     dbg_info("{0}:load state...begin",this->m_sName);
     // STEP 0: check if data path exists
     checkOrCreateDir(this->m_sDataPath);
+    dbg_info("{0}:checkOrCreateDir passed.",this->m_sName);
     // STEP 1: get file name
     const string metaFile = this->m_sDataPath + "/" + this->m_sName + "." + METAFILE_SUFFIX;
     const string dataFile = this->m_sDataPath + "/" + this->m_sName + "." + DATAFILE_SUFFIX;
     bool bCreate = checkOrCreateMetaFile(metaFile);
     checkOrCreateDataFile(dataFile);
+    dbg_info("{0}:checkOrCreateDataFile passed.",this->m_sName);
     // STEP 2: open files
     this->m_iMetaFileDesc = open(metaFile.c_str(),O_RDWR);
     if (this->m_iMetaFileDesc == -1) {
@@ -78,6 +80,7 @@ namespace ns_persistent{
     if (this->m_pData == MAP_FAILED) {
       throw PERSIST_EXP_MMAP_FILE(errno);
     }
+    dbg_info("{0}:data/meta file mapped to memory",this->m_sName);
     // STEP 4: initialize the header for new created Metafile
     if (bCreate) {
       MetaHeader *pmh = (MetaHeader *)this->m_pMeta;
@@ -89,11 +92,14 @@ namespace ns_persistent{
         throw PERSIST_EXP_MSYNC(errno);
       }
       ML_UNLOCK;
+      dbg_info("{0}:new header initialized.",this->m_sName);
     }
     // STEP 5: update m_hlcLE with the latest event
     if (META_HEADER->fields.eno >0) {
-      if (this->m_hlcLE < CURR_LOG_ENTRY->fields.hlc){
-        this->m_hlcLE = CURR_LOG_ENTRY->fields.hlc;
+      if (this->m_hlcLE.m_rtc_us < CURR_LOG_ENTRY->fields.hlc_r &&
+        this->m_hlcLE.m_logic < CURR_LOG_ENTRY->fields.hlc_l){
+        this->m_hlcLE.m_rtc_us = CURR_LOG_ENTRY->fields.hlc_r;
+        this->m_hlcLE.m_logic = CURR_LOG_ENTRY->fields.hlc_l;
       }
     }
     dbg_info("{0}:load state...done",this->m_sName);
@@ -132,9 +138,10 @@ namespace ns_persistent{
     // fill and flush log entry
     NEXT_LOG_ENTRY->fields.dlen = size;
     NEXT_LOG_ENTRY->fields.ofst = META_HEADER->fields.ofst;
-    NEXT_LOG_ENTRY->fields.hlc = (mhlc > this->m_hlcLE)?mhlc:this->m_hlcLE;
-    NEXT_LOG_ENTRY->fields.hlc.tick(false);
-    this->m_hlcLE = NEXT_LOG_ENTRY->fields.hlc;
+    this->m_hlcLE = (mhlc > this->m_hlcLE)?mhlc:this->m_hlcLE;
+    this->m_hlcLE.tick(false);
+    NEXT_LOG_ENTRY->fields.hlc_r = this->m_hlcLE.m_rtc_us;
+    NEXT_LOG_ENTRY->fields.hlc_l = this->m_hlcLE.m_logic;
     if (msync(ALIGN_TO_PAGE(NEXT_LOG_ENTRY), 
         sizeof(LogEntry) + (((uint64_t)NEXT_LOG_ENTRY) % PAGE_SIZE),MS_SYNC) != 0) {
       ML_UNLOCK;

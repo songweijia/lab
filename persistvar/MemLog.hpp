@@ -20,7 +20,8 @@ namespace ns_persistent {
     struct {
       uint64_t dlen;    // length of the data
       uint64_t ofst;    // offset of the data
-      HLC hlc;          // HLC clock of the data
+      uint64_t hlc_r;   // realtime component of hlc
+      uint64_t hlc_l;   // logic component of hlc
     } fields;
     uint8_t bytes[32];
   } LogEntry;

@@ -58,9 +58,10 @@ namespace ns_persistent{
     // fill log entry
     NEXT_LOG_ENTRY->fields.dlen = size;
     NEXT_LOG_ENTRY->fields.ofst = META_HEADER->fields.ofst;
-    NEXT_LOG_ENTRY->fields.hlc = (mhlc > this->m_hlcLE)?mhlc:this->m_hlcLE;
-    NEXT_LOG_ENTRY->fields.hlc.tick();
-    this->m_hlcLE = NEXT_LOG_ENTRY->fields.hlc;
+    this->m_hlcLE = (mhlc > this->m_hlcLE)?mhlc:this->m_hlcLE;
+    this->m_hlcLE.tick();
+    NEXT_LOG_ENTRY->fields.hlc_r = this->m_hlcLE.m_rtc_us;
+    NEXT_LOG_ENTRY->fields.hlc_l = this->m_hlcLE.m_logic;
 
     // update meta header
     META_HEADER->fields.eno ++;
@@ -101,12 +102,17 @@ namespace ns_persistent{
     int64_t head = 0, tail = len - 1;
     int64_t pivot = len/2;
     while (head <= tail) {
-      if ((logArr+pivot)->fields.hlc == rhlc){
+      if ((logArr+pivot)->fields.hlc_r == rhlc.m_rtc_us && 
+        (logArr+pivot)->fields.hlc_l == rhlc.m_logic){
         break; // found
-      } else if ((logArr+pivot)->fields.hlc < rhlc){
+      } else if ((logArr+pivot)->fields.hlc_r < rhlc.m_rtc_us ||
+        ((logArr+pivot)->fields.hlc_r == rhlc.m_rtc_us &&
+          (logArr+pivot)->fields.hlc_l < rhlc.m_logic)){
         if (pivot + 1 >= len) {
           break; // found
-        } else if ((logArr+pivot)->fields.hlc > rhlc) {
+        } else if ((logArr+pivot+1)->fields.hlc_r > rhlc.m_rtc_us ||
+          ((logArr+pivot+1)->fields.hlc_r == rhlc.m_rtc_us &&
+            (logArr+pivot+1)->fields.hlc_l > rhlc.m_logic)){
           break; // found
         } else { // search right
           head = pivot + 1;

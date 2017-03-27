@@ -213,66 +213,10 @@ namespace ns_persistent {
         return this->get(hlc);
       }
 
-      /* deprecated
-      // get the latest Value of T
-      // virtual std::shared_ptr<ObjectType> get() noexcept(false)
-      // This is a read-only value, could be access concurrently.
-      virtual const ObjectType & get (DeserializationManager *dm=nullptr) noexcept(false) {
-
-        // - get the latest version
-        int64_t ver = this->m_pLog->getLength() - 1;
-        if(ver < 0){
-          throw PERSIST_EXP_EMPTY_LOG;
-        }
-
-        return this->get(ver,dm);
-      };
-      */
-
       // get number of the versions
       virtual int64_t getNumOfVersions() noexcept(false) {
         return this->m_pLog->getLength();
       };
-
-      /* deprecated
-      // get the value defined by version
-      // version number >= 0
-      // negtive number means how many versions we go back from the latest
-      // version. -1 means the previous version.
-      //virtual std::shared_ptr<ObjectType> get(const int64_t & version) noexcept(false){
-      virtual const ObjectType & get(const int64_t & version, DeserializationManager* dm=nullptr) noexcept(false) {
-        //TODO: use Matt's deserialization library
-        int64_t ver = version;
-        std::shared_ptr<ObjectType> pObj;
-
-        if (ver < 0) {
-          ver += this->m_pLog->getLength();
-        }
-
-        // - lock
-        if (pthread_spin_lock(&this->m_aCache[VERSION_HASH(ver)].lck) != 0) {
-          throw PERSIST_EXP_SPIN_LOCK(errno);
-        }
-
-        // - check and fill cache
-         if( ! VERSION_IS_CACHED(ver) ){
-          const void *raw = this->m_pLog->getEntry(ver);
-          this->m_aCache[VERSION_HASH(ver)].obj.reset();
-          this->m_aCache[VERSION_HASH(ver)].obj = 
-            std::make_shared<ObjectType>(*ObjectType::deserialize(raw));
-        }
-
-        // - read from persistent log
-        pObj = GET_CACHED_OBJ_PTR(ver);
-
-        // - unlock
-        if (pthread_spin_unlock(&this->m_aCache[VERSION_HASH(ver)].lck) != 0) {
-          throw PERSIST_EXP_SPIN_UNLOCK(errno);
-        }
-
-        return pObj;
-      };
-      */
 
       // set value: this increases the version number by 1.
       virtual void set(const ObjectType &v, const HLC &mhlc) 
@@ -290,19 +234,6 @@ namespace ns_persistent {
         HLC mhlc; // generate a default timestamp for it.
         this->set(v,mhlc);
       }
-
-#ifdef HLC_ENABLED
-
-      //TODO
-      // HLC based get/set: this feature will be added later, let's don't
-      // worry about it now.
-      // get the value defined by HLC time:
-      virtual const ObjectType& get(const HLC &ts){ throw exp... };
-
-      // set the value defined by HLC time:
-      virtual void set(const ObjectType &v, const HLC &msg_ts)
-
-#endif//HLC_ENABLED
 
       // internal _NameMaker class
       class _NameMaker{
