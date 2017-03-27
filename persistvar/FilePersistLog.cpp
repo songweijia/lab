@@ -15,60 +15,9 @@ namespace ns_persistent{
   // internal structures //
   /////////////////////////
 
-  // meta file header format
-  typedef union meta_header {
-    struct {
-      int64_t eno;      // number of entry
-      uint64_t ofst;    // next available offset in Data File.
-    } fields;
-    uint8_t bytes[32];
-  } MetaHeader;
-
-  // log entry format
-  typedef union log_entry {
-    struct {
-      uint64_t dlen;    // length of the data
-      uint64_t ofst;	// offset of the data
-      HLC hlc;          // HLC clock of the data
-    } fields;
-    uint8_t bytes[32];
-  } LogEntry;
-
-  // helpers
-  #define META_HEADER ((MetaHeader*)this->m_pMeta)
-  #define LOG_ENTRY_ARRAY       ((LogEntry*)((uint8_t*)this->m_pMeta + sizeof(MetaHeader)))
-  #define NEXT_LOG_ENTRY        (LOG_ENTRY_ARRAY + META_HEADER->fields.eno)
-  #define CURR_LOG_ENTRY        (NEXT_LOG_ENTRY - 1)
-  #define NEXT_DATA             ((void *)((uint64_t)this->m_pData + META_HEADER->fields.ofst))
-  #define PAGE_SIZE             (getpagesize())
-  #define ALIGN_TO_PAGE(x)      ((void *)(((uint64_t)(x))-((uint64_t)(x))%PAGE_SIZE))
-  #define LOG_ENTRY_DATA(e)     ((void *)(((uint64_t)this->m_pData)+(e)->fields.ofst))
-
   // size limit for the meta and data file
   #define METAFILE_SIZE (0x1ull<<30)
   #define DATAFILE_SIZE (0x1ull<<40)
-
-  // lock macro
-  #define FPL_WRLOCK \
-  do { \
-    if (pthread_rwlock_wrlock(&this->m_rwlock) != 0) { \
-      throw PERSIST_EXP_RWLOCK_WRLOCK(errno); \
-    } \
-  } while (0)
-
-  #define FPL_RDLOCK \
-  do { \
-    if (pthread_rwlock_rdlock(&this->m_rwlock) != 0) { \
-      throw PERSIST_EXP_RWLOCK_WRLOCK(errno); \
-    } \
-  } while (0)
-
-  #define FPL_UNLOCK \
-  do { \
-    if (pthread_rwlock_unlock(&this->m_rwlock) != 0) { \
-      throw PERSIST_EXP_RWLOCK_UNLOCK(errno); \
-    } \
-  } while (0)
 
   // verify the existence of a folder
   // Check if directory exists or not. Create it on absence.
@@ -86,10 +35,12 @@ namespace ns_persistent{
   ////////////////////////
 
   FilePersistLog::FilePersistLog(const string &name, const string &dataPath) 
-  noexcept(false) : PersistLog(name),
+  noexcept(false) : MemLog(name),
   m_sDataPath(dataPath){
     this->m_iMetaFileDesc = -1;
     this->m_iDataFileDesc = -1;
+    free(this->m_pMeta); // release the memory allocated in MemLog
+    free(this->m_pData); // release the memory allocated in MemLog
     this->m_pMeta = MAP_FAILED;
     this->m_pData = MAP_FAILED;
     if (pthread_rwlock_init(&this->m_rwlock,NULL) != 0) {
@@ -130,12 +81,12 @@ namespace ns_persistent{
       MetaHeader *pmh = (MetaHeader *)this->m_pMeta;
       pmh->fields.eno = 0ull;
       pmh->fields.ofst = 0ull;
-      FPL_WRLOCK;
+      ML_WRLOCK;
       if (msync(this->m_pMeta,sizeof(MetaHeader),MS_SYNC) != 0) {
-        FPL_UNLOCK;
+        ML_UNLOCK;
         throw PERSIST_EXP_MSYNC(errno);
       }
-      FPL_UNLOCK;
+      ML_UNLOCK;
     }
     // STEP 5: update m_hlcLE with the latest event
     if (META_HEADER->fields.eno >0) {
@@ -151,9 +102,11 @@ namespace ns_persistent{
     if (this->m_pData != MAP_FAILED){
       munmap(m_pData,DATAFILE_SIZE);
     }
+    this->m_pData = nullptr; // prevent ~MemLog() destructor to release it again.
     if (this->m_pMeta != MAP_FAILED){
       munmap(m_pMeta,METAFILE_SIZE);
     }
+    this->m_pMeta = nullptr; // prevent ~MemLog() destructor to release it again.
     if (this->m_iMetaFileDesc != -1){
       close(this->m_iMetaFileDesc);
     }
@@ -164,12 +117,12 @@ namespace ns_persistent{
 
   void FilePersistLog::append(const void *pdat, uint64_t size, const HLC & mhlc)
   noexcept(false) {
-    FPL_WRLOCK;
+    ML_WRLOCK;
 
     // copy and flush data
     memcpy(NEXT_DATA,pdat,size);
     if (msync(ALIGN_TO_PAGE(NEXT_DATA),size + (((uint64_t)NEXT_DATA) % PAGE_SIZE),MS_SYNC) != 0) {
-      FPL_UNLOCK;
+      ML_UNLOCK;
       throw PERSIST_EXP_MSYNC(errno);
     }
 
@@ -181,7 +134,7 @@ namespace ns_persistent{
     this->m_hlcLE = NEXT_LOG_ENTRY->fields.hlc;
     if (msync(ALIGN_TO_PAGE(NEXT_LOG_ENTRY), 
         sizeof(LogEntry) + (((uint64_t)NEXT_LOG_ENTRY) % PAGE_SIZE),MS_SYNC) != 0) {
-      FPL_UNLOCK;
+      ML_UNLOCK;
       throw PERSIST_EXP_MSYNC(errno);
     }
 
@@ -189,99 +142,11 @@ namespace ns_persistent{
     META_HEADER->fields.eno ++;
     META_HEADER->fields.ofst += size;
     if (msync(this->m_pMeta,sizeof(MetaHeader),MS_SYNC) != 0) {
-      FPL_UNLOCK;
+      ML_UNLOCK;
       throw PERSIST_EXP_MSYNC(errno);
     }
     
-    FPL_UNLOCK;
-  }
-
-  int64_t FilePersistLog::getLength()
-  noexcept(false) {
-
-    FPL_RDLOCK;
-    int64_t len = META_HEADER->fields.eno;
-    FPL_UNLOCK;
-
-    return len;
-  }
-
-  const void * FilePersistLog::getEntry(int64_t eidx)
-  noexcept(false) {
-
-    FPL_RDLOCK;
-    if (META_HEADER->fields.eno < eidx || (eidx + (int64_t)META_HEADER->fields.eno) < 0 ) {
-      FPL_UNLOCK;
-      throw PERSIST_EXP_INV_ENTRY_IDX(eidx);
-    }
-    int64_t ridx = (eidx < 0)?((int64_t)META_HEADER->fields.eno + eidx):eidx;
-    FPL_UNLOCK;
-
-    return LOG_ENTRY_DATA(LOG_ENTRY_ARRAY + ridx);
-  }
-
-  // find the log entry by HLC timestmap:rhlc
-  static LogEntry * binarySearch(const HLC &rhlc, LogEntry *logArr, int64_t len) {
-    if (len <= 0) {
-      return nullptr;
-    }
-    int64_t head = 0, tail = len - 1;
-    int64_t pivot = len/2;
-    while (head <= tail) {
-      if ((logArr+pivot)->fields.hlc == rhlc){
-        break; // found
-      } else if ((logArr+pivot)->fields.hlc < rhlc){
-        if (pivot + 1 >= len) {
-          break; // found
-        } else if ((logArr+pivot)->fields.hlc > rhlc) {
-          break; // found
-        } else { // search right
-          head = pivot + 1;
-        }
-      } else { // search left
-        tail = pivot - 1;
-        if (head > tail) {
-          return nullptr;
-        }
-      }
-    }
-    return logArr + pivot;
-  }
-
-  const void * FilePersistLog::getEntry(const HLC &rhlc)
-  noexcept(false) {
-
-    uint64_t now = read_rtc_us();
-    LogEntry * ple = nullptr;
-
-    FPL_RDLOCK;
-
-    if (this->m_hlcLE < rhlc) {
-      if (now <= rhlc.m_rtc_us) {
-        // read future
-        FPL_UNLOCK;
-        throw PERSIST_EXP_READ_FUTURE;
-      } else {
-        // update m_hlcLE to read clock
-        FPL_UNLOCK;
-        FPL_WRLOCK;
-        this->m_hlcLE = rhlc;
-        FPL_UNLOCK;
-        FPL_RDLOCK;
-      }
-    }
-
-    //binary search
-    ple = binarySearch(rhlc,LOG_ENTRY_ARRAY,META_HEADER->fields.eno);
-
-    FPL_UNLOCK;
-
-    // no object exists before the requested timestamp.
-    if (ple == nullptr){
-      return nullptr;
-    }
-
-    return LOG_ENTRY_DATA(ple);
+    ML_UNLOCK;
   }
 
   /*** -  deprecated
@@ -289,11 +154,11 @@ namespace ns_persistent{
   noexcept(false) {
     void * ent = NULL;
 
-    FPL_RDLOCK;
+    ML_RDLOCK;
     if (META_HEADER->fields.eno > 0) {
       ent = LOG_ENTRY_DATA(LOG_ENTRY_ARRAY + META_HEADER->fields.eno - 1);
     }
-    FPL_UNLOCK;
+    ML_UNLOCK;
 
     return ent;
   }

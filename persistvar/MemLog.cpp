@@ -11,64 +11,9 @@ using namespace std;
 
 namespace ns_persistent{
 
-  /////////////////////////
-  // internal structures //
-  /////////////////////////
-
-  // meta file header format
-  typedef union meta_header {
-    struct {
-      int64_t eno;      // number of entry
-      uint64_t ofst;    // next available offset in Data buffer.
-    } fields;
-    uint8_t bytes[32];
-  } MetaHeader;
-
-  // log entry format
-  typedef union log_entry {
-    struct {
-      uint64_t dlen;    // length of the data
-      uint64_t ofst;	// offset of the data
-      HLC hlc;          // HLC clock of the data
-    }fields;
-    uint8_t bytes[32];
-  } LogEntry;
-
-  // helpers
-  #define META_HEADER ((MetaHeader*)this->m_pMeta)
-  #define LOG_ENTRY_ARRAY       ((LogEntry*)((uint8_t*)this->m_pMeta + sizeof(MetaHeader)))
-  #define NEXT_LOG_ENTRY        (LOG_ENTRY_ARRAY + META_HEADER->fields.eno)
-  #define CURR_LOG_ENTRY        (NEXT_LOG_ENTRY - 1)
-  #define NEXT_DATA             ((void *)((uint64_t)this->m_pData + META_HEADER->fields.ofst))
-  #define PAGE_SIZE             (getpagesize())
-  #define ALIGN_TO_PAGE(x)      ((void *)(((uint64_t)(x))-((uint64_t)(x))%PAGE_SIZE))
-  #define LOG_ENTRY_DATA(e)     ((void *)(((uint64_t)this->m_pData)+(e)->fields.ofst))
-
   // size limit for the meta and data file
   #define META_SIZE (0x1ull<<20)
   #define DATA_SIZE (0x1ull<<30)
-
-  // lock macro
-  #define ML_WRLOCK \
-  do { \
-    if (pthread_rwlock_wrlock(&this->m_rwlock) != 0) { \
-      throw PERSIST_EXP_RWLOCK_WRLOCK(errno); \
-    } \
-  } while (0)
-
-  #define ML_RDLOCK \
-  do { \
-    if (pthread_rwlock_rdlock(&this->m_rwlock) != 0) { \
-      throw PERSIST_EXP_RWLOCK_WRLOCK(errno); \
-    } \
-  } while (0)
-
-  #define ML_UNLOCK \
-  do { \
-    if (pthread_rwlock_unlock(&this->m_rwlock) != 0) { \
-      throw PERSIST_EXP_RWLOCK_UNLOCK(errno); \
-    } \
-  } while (0)
 
   ////////////////////////
   // visible to outside //
