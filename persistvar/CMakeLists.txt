@@ -31,5 +31,5 @@ link_directories(dependencies/mutils dependencies/mutils-serialization)
 add_library(persistent Persistent.hpp PersistLog.cpp PersistLog.hpp FilePersistLog.cpp FilePersistLog.hpp MemLog.cpp MemLog.hpp HLC.cpp HLC.hpp)
 output_directory(persistent target/usr/local/lib)
 
-add_executable(tst tst.cpp)
-target_link_libraries(tst persistent pthread)
+add_executable(ptst test.cpp)
+target_link_libraries(ptst persistent pthread)
