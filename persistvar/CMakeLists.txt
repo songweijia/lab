@@ -32,4 +32,4 @@ add_library(persistent Persistent.hpp PersistLog.cpp PersistLog.hpp FilePersistL
 output_directory(persistent target/usr/local/lib)
 
 add_executable(ptst test.cpp)
-target_link_libraries(ptst persistent pthread)
+target_link_libraries(ptst persistent pthread mutils mutils-serialization)
