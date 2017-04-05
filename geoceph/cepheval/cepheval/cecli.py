@@ -57,7 +57,7 @@ class CephEvalClient:
     rep_factor=3, \
     objsize_byte=1024, \
     num_concurrent=16, \
-    dur_sec=120, \
+    dur_sec=30, \
     pg_num=64, \
     pgp_num=64, \
     pool_type='replicated'):
@@ -121,8 +121,8 @@ class CephEvalClient:
     util.remote_exec(ssh_client,commands=[ \
       "rm -rf %s; mkdir %s" % (self._test_tmp_dir,self._test_tmp_dir), \
       "rados bench %d write -p %s -b %d -t %d --no-cleanup > %s/write_%s" % (conf['duration'],self._test_pool_name,conf['obj_size'],conf['concurrent'],self._test_tmp_dir,self.conf_to_str(conf)), \
-      "rados bench %d seq -p %s -b %d -t %d > %s/seq_%s" % (conf['duration'],self._test_pool_name,conf['obj_size'],conf['concurrent'],self._test_tmp_dir,self.conf_to_str(conf)), \
-      "rados bench %d rand -p %s -b %d -t %d > %s/rand_%s" % (conf['duration'],self._test_pool_name,conf['obj_size'],conf['concurrent'],self._test_tmp_dir,self.conf_to_str(conf)) \
+      "rados bench %d seq -p %s -t %d > %s/seq_%s" % (conf['duration'],self._test_pool_name,conf['concurrent'],self._test_tmp_dir,self.conf_to_str(conf)), \
+      "rados bench %d rand -p %s -t %d > %s/rand_%s" % (conf['duration'],self._test_pool_name,conf['concurrent'],self._test_tmp_dir,self.conf_to_str(conf)) \
       ],verifiers=[None,None,None,None])
     # STEP 6: collect results
     for tn in ['write','seq','rand']:
@@ -203,10 +203,10 @@ class CephEvalClient:
       os.remove(self._data)
       os.makedirs(self._data)
     # STEP 2: run exp...
-    for rf in [1,3]:
+    for rf in [1,3,5]:
 #      for oso in range(3,24,2):
-      for oso in range(3,13):
-        for concurrent in [1,16]:
+      for oso in range(3,18):
+        for concurrent in [1,4,16,64]:
           self.run_one(self.gen_conf(rep_factor=rf,objsize_byte=(1<<oso),num_concurrent=concurrent));
 
   def parse(self):
@@ -277,6 +277,9 @@ class CephEvalClient:
     ax1.set_xlabel('Object size (Bytes)')
     ax1.set_ylabel('Throughput (MB/s)')
     ax2.set_ylabel('Latency (sec)')
-    ax1.legend(lns,lbs,ncol=2,loc=0)
+    ax1.legend(lns,lbs,ncol=4,loc=0)
+    # tight
+    fig.set_size_inches(16,12)
+    fig.tight_layout()
     plt.savefig('/'.join((self._data,'fig1.eps')))
     plt.close()
