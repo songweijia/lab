@@ -167,13 +167,13 @@ class CephEvalClient:
         thp[2] = float(line.split()[-1]) # minimum throughput
       elif "Max bandwidth (MB/sec):" in line:
         thp[3] = float(line.split()[-1]) # maximum throughput
-      elif "Average Latency:" in line:
+      elif "Average Latency" in line:
         lat[0] = float(line.split()[-1]) # average latency
-      elif "Stddev Latency:" in line:
+      elif "Stddev Latency" in line:
         lat[1] = float(line.split()[-1]) # stddev latency
-      elif "Min latency:" in line:
+      elif "Min latency" in line:
         lat[2] = float(line.split()[-1]) # minimum latency
-      elif "Max latency:" in line:
+      elif "Max latency" in line:
         lat[3] = float(line.split()[-1]) # maximum latency
     f.close()
     vec = [conf['rep_factor'],conf['obj_size'],conf['concurrent'],conf['duration'],conf['pg_num'],conf['pgp_num'],pt,exp] + thp + lat
@@ -219,11 +219,11 @@ class CephEvalClient:
     else:
       numpy.savetxt('/'.join((self._data,self._data_file)),m,fmt="%.4f")
 
-  def draw_fig1(self,fmt="%W %Y %R"):
+  def draw_fig1(self,fmt="%W %Y %R",flt={},outfile='fig1'):
     """
     Draw a figure with two y-axis: the throughput and the latency.
     The x-axis is object size (log scale).
-    'fmt' specify the legend we use to describe each line.
+    'fmt' specifies the legend we use to describe each line.
     P - (P)ool type: replicated/erasure
     W - (W)orkload: write/seq(r)/rand(r)
     R - (R)eplication factor: 1/3/5
@@ -232,6 +232,17 @@ class CephEvalClient:
     g - number of placement (g)roups
     G - number of placement (G)roups for placement
     Y - (Y)-axis: thp/lat
+    'flt' specifies which series to include.
+    P - (P)ool type: replicated/erasure
+    W - (W)orkload: write/seq/rand
+    R - (R)eplication factor: 1/3/5
+    C - number of (C)oncurrent clients
+    example for 'flt':
+    flt = { \
+      'P': ['replicated'];
+      'W': ['write','seq','rand'];
+      'R': [1,3,5]
+      'C': [1,4,16,64]
     """
     # STEP 1 Load data
     dat = numpy.loadtxt('/'.join((self._data,self._data_file)))
@@ -243,7 +254,7 @@ class CephEvalClient:
     lns = []
     lbs = []
     ptDict = {0:'replicated',1:'erasure'}
-    wlDict = {0:'write',1:'seq_read',2:'rand_read'}
+    wlDict = {0:'write',1:'seq',2:'rand'}
     # STEP 3 plot series
     for (k,g) in groupby(sdat, lambda x:map(x.__getitem__,[0,2,3,4,5,6,7])):
       # STEP 3.1 get legend
@@ -261,6 +272,20 @@ class CephEvalClient:
         .replace('%D',fD) \
         .replace('%g',fg) \
         .replace('%G',fG)
+      # STEP 3.1.5 - filter
+      if 'P' in flt and fP not in flt['P']:
+        logger.info("skip P=%s" % fP)
+        continue
+      if 'W' in flt and fW not in flt['W']:
+        logger.info("skip W=%s" % fW)
+        continue
+      if 'R' in flt and fR not in str(flt['R']):
+        logger.info("skip R=%s" % fR)
+        continue
+      if 'C' in flt and fC not in str(flt['C']):
+        logger.info("skip C=%s" % fC)
+        continue
+      logger.info("Added series: P=%s W=%s R=%s C=%s", fP,fW,fR,fC)
       # STEP 3.2 plot
       s = numpy.array(list(g))
       ss = s[s[:,1].argsort()]
@@ -273,7 +298,7 @@ class CephEvalClient:
       lns.append(ln_lat)
       lbs.append(lb_lat)
     # STEP 4 lables
-    ax1.set_xscale('log')
+    ax1.set_xscale('log',base=2)
     ax1.set_xlabel('Object size (Bytes)')
     ax1.set_ylabel('Throughput (MB/s)')
     ax2.set_ylabel('Latency (sec)')
@@ -281,5 +306,5 @@ class CephEvalClient:
     # tight
     fig.set_size_inches(16,12)
     fig.tight_layout()
-    plt.savefig('/'.join((self._data,'fig1.eps')))
+    plt.savefig('/'.join((self._data,'%s.eps' % outfile)))
     plt.close()
