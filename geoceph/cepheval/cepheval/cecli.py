@@ -255,6 +255,8 @@ class CephEvalClient:
     lbs = []
     ptDict = {0:'replicated',1:'erasure'}
     wlDict = {0:'write',1:'seq',2:'rand'}
+    markers = ["o","v","s","P","^","*","<","p","h",">"]
+    cnt = 0
     # STEP 3 plot series
     for (k,g) in groupby(sdat, lambda x:map(x.__getitem__,[0,2,3,4,5,6,7])):
       # STEP 3.1 get legend
@@ -289,22 +291,27 @@ class CephEvalClient:
       # STEP 3.2 plot
       s = numpy.array(list(g))
       ss = s[s[:,1].argsort()]
-      ln_thp, = ax1.plot(ss[:,1],ss[:,8])
+      ln_thp, = ax1.plot(ss[:,1],ss[:,8],marker=markers[cnt%len(markers)])
       lb_thp = lb.replace('%Y','thp')
       lns.append(ln_thp)
       lbs.append(lb_thp)
-      ln_lat, = ax2.plot(ss[:,1],ss[:,12],'--')
+      ln_lat, = ax2.plot(ss[:,1],ss[:,12],'--',marker=markers[cnt%len(markers)])
       lb_lat = lb.replace('%Y','lat')
       lns.append(ln_lat)
       lbs.append(lb_lat)
+      cnt = cnt + 1
     # STEP 4 lables
-    ax1.set_xscale('log',base=2)
+    ax1.set_xscale('log',basex=2)
     ax1.set_xlabel('Object size (Bytes)')
     ax1.set_ylabel('Throughput (MB/s)')
     ax2.set_ylabel('Latency (sec)')
-    ax1.legend(lns,lbs,ncol=4,loc=0)
+    ax1.legend(lns,lbs,ncol=2,loc=0)
+    y1lim = ax1.get_ylim()
+    y2lim = ax2.get_ylim()
+    ax1.set_ylim((0,y1lim[1]*1.2))
+    ax2.set_ylim((0,y2lim[1]*1.2))
     # tight
-    fig.set_size_inches(16,12)
+    # fig.set_size_inches(16,12)
     fig.tight_layout()
     plt.savefig('/'.join((self._data,'%s.eps' % outfile)))
     plt.close()
