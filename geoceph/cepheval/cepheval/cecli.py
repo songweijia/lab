@@ -9,6 +9,7 @@ from itertools import groupby
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
+import time
 import util
 
 logger = logging.getLogger(__name__)
@@ -57,9 +58,9 @@ class CephEvalClient:
     rep_factor=3, \
     objsize_byte=1024, \
     num_concurrent=16, \
-    dur_sec=30, \
-    pg_num=64, \
-    pgp_num=64, \
+    dur_sec=15, \
+    pg_num=256, \
+    pgp_num=256, \
     pool_type='replicated'):
     return { \
       "rep_factor":rep_factor, \
@@ -108,6 +109,8 @@ class CephEvalClient:
     logger.debug("connected to ceph admin node: %s." % self._ah)
     # STEP 2: config ceph pool
     util.remote_exec(ssh_client,commands=["ceph osd pool delete %s %s --yes-i-really-really-mean-it" % (self._test_pool_name,self._test_pool_name)],verifiers=[None])
+    # sleep 30 seconds after delete....
+    time.sleep(30)
     util.remote_exec(ssh_client,commands=["ceph osd pool create %s %d %d %s" % (self._test_pool_name,conf["pg_num"],conf["pgp_num"],conf['pool_type'])],verifiers=[None])
     util.remote_exec(ssh_client,commands=["ceph osd pool set %s size %d" % (self._test_pool_name,conf['rep_factor'])],verifiers=[None])
     util.remote_exec(ssh_client,commands=["ceph osd pool set %s min_size %d" % (self._test_pool_name,conf['rep_factor'])],verifiers=[None])
@@ -203,10 +206,11 @@ class CephEvalClient:
       os.remove(self._data)
       os.makedirs(self._data)
     # STEP 2: run exp...
-    for rf in [1,3,5]:
+    #for rf in [1,3,5]:
+    for rf in [5,3,1]:
 #      for oso in range(3,24,2):
-      for oso in range(3,18):
-        for concurrent in [1,4,16,64]:
+      for oso in range(5,24,2):
+        for concurrent in [1,4,16]:
           self.run_one(self.gen_conf(rep_factor=rf,objsize_byte=(1<<oso),num_concurrent=concurrent));
 
   def parse(self):
