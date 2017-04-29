@@ -110,7 +110,7 @@ class CephEvalClient:
     # STEP 2: config ceph pool
     util.remote_exec(ssh_client,commands=["ceph osd pool delete %s %s --yes-i-really-really-mean-it" % (self._test_pool_name,self._test_pool_name)],verifiers=[None])
     # sleep 30 seconds after delete....
-    time.sleep(30)
+    time.sleep(15)
     util.remote_exec(ssh_client,commands=["ceph osd pool create %s %d %d %s" % (self._test_pool_name,conf["pg_num"],conf["pgp_num"],conf['pool_type'])],verifiers=[None])
     util.remote_exec(ssh_client,commands=["ceph osd pool set %s size %d" % (self._test_pool_name,conf['rep_factor'])],verifiers=[None])
     util.remote_exec(ssh_client,commands=["ceph osd pool set %s min_size %d" % (self._test_pool_name,conf['rep_factor'])],verifiers=[None])
@@ -206,11 +206,12 @@ class CephEvalClient:
       os.remove(self._data)
       os.makedirs(self._data)
     # STEP 2: run exp...
-    #for rf in [1,3,5]:
-    for rf in [5,3,1]:
+    for rf in [1,3,5]:
+    #for rf in [3]:
 #      for oso in range(3,24,2):
-      for oso in range(5,24,2):
-        for concurrent in [1,4,16]:
+#      for oso in range(5,24,2):
+      for oso in range(23,4,-2):
+        for concurrent in [1,4,16,32,64]:
           self.run_one(self.gen_conf(rep_factor=rf,objsize_byte=(1<<oso),num_concurrent=concurrent));
 
   def parse(self):
