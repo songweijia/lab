@@ -28,10 +28,17 @@ namespace ns_persistent{
   #define PERSIST_EXP_SPIN_INIT(x)                      PERSIST_EXP(17,(x))
   #define PERSIST_EXP_SPIN_LOCK(x)                      PERSIST_EXP(18,(x))
   #define PERSIST_EXP_SPIN_UNLOCK(x)                    PERSIST_EXP(19,(x))
-  #define PERSIST_EXP_INV_VER(x)                        PERSIST_EXP(20,(x))
+  #define PERSIST_EXP_INV_VERSION                       PERSIST_EXP(20,0)
   #define PERSIST_EXP_ALLOC(x)                          PERSIST_EXP(21,(x))
   #define PERSIST_EXP_READ_FUTURE                       PERSIST_EXP(22,0)
   #define PERSIST_EXP_INV_HLC                           PERSIST_EXP(23,0)
+  #define PERSIST_EXP_MUTEX_INIT(x)                     PERSIST_EXP(24,(x))
+  #define PERSIST_EXP_MUTEX_LOCK(x)                     PERSIST_EXP(25,(x))
+  #define PERSIST_EXP_MUTEX_UNLOCK(x)                   PERSIST_EXP(26,(x))
+  #define PERSIST_EXP_READ_FILE(x)                      PERSIST_EXP(27,(x))
+  #define PERSIST_EXP_WRITE_FILE(x)                     PERSIST_EXP(28,(x))
+  #define PERSIST_EXP_RENAME_FILE(x)                    PERSIST_EXP(29,(x))
+  #define PERSIST_EXP_NOSPACE                           PERSIST_EXP(30,0)
 }
 
 #endif//PERSISTENT_EXCEPTION_HPP

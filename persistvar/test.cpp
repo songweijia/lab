@@ -23,7 +23,6 @@ public:
 // A variable that can change the length of its value
 class VariableBytes : public ByteRepresentable{
 public:
-#define MAX_DATA_SIZE (1<<25)
   std::size_t data_len;
   char buf[MAX_DATA_SIZE];
 
@@ -53,7 +52,7 @@ static void printhelp(){
   cout << "usage:" << endl;
   cout << "\tget <version>" << endl;
   cout << "\tgetbytime <timestamp>" << endl;
-  cout << "\tset value" << endl;
+  cout << "\tset value version" << endl;
   cout << "\tlist" << endl;
   cout << "\tvolatile" << endl;
   cout << "\thlc" << endl;
@@ -77,12 +76,12 @@ void listvar(Persistent<OT,st> &var){
   cout<<"Number of Versions:\t"<<nv<<endl;
   while(nv-- > 0){
     // by lambda
-    var.get(nv,
+    var.getByIndex(nv,
       [&](OT& x) {
         cout<<"["<<nv<<"]\t"<<x.to_string()<<"\t//by lambda"<<endl;
       });
     // by copy
-    cout<<"["<<nv<<"]\t"<<var.get(nv)->to_string()<<"\t//by copy"<<endl;
+    cout<<"["<<nv<<"]\t"<<var.getByIndex(nv)->to_string()<<"\t//by copy"<<endl;
   }
 }
 
@@ -94,9 +93,10 @@ static void eval_write (std::size_t osize, int nops) {
   writeMe.data_len = osize;
   struct timespec ts,te;
   int cnt = nops;
+  __int128 ver = (__int128)0l;
   clock_gettime(CLOCK_REALTIME,&ts);
   while(cnt -- > 0) {
-    pvar.set(writeMe);
+    pvar.set(writeMe,ver++);
   }
   clock_gettime(CLOCK_REALTIME,&te);
   long sec = (te.tv_sec - ts.tv_sec);
@@ -127,12 +127,12 @@ int main(int argc,char ** argv){
     else if (strcmp(argv[1],"get") == 0){
       int64_t nv = atol(argv[2]);
       // by lambda
-      px1.get(nv,
+      px1.getByIndex(nv,
         [&](X& x) { 
           cout<<"["<<nv<<"]\t"<<x.x<<"\t//by lambda"<<endl;
         });
       // by copy
-      cout<<"["<<nv<<"]\t"<<px1.get(nv)->x<<"\t//by copy"<<endl;
+      cout<<"["<<nv<<"]\t"<<px1.getByIndex(nv)->x<<"\t//by copy"<<endl;
     }
     else if (strcmp(argv[1],"getbytime") == 0){
       HLC hlc;
@@ -145,24 +145,26 @@ int main(int argc,char ** argv){
     }
     else if (strcmp(argv[1],"set") == 0) {
       int v = atoi(argv[2]);
+      __int128 ver = (__int128)atoi(argv[3]);
       X x;
       x.x = v;
-      px1.set(x);
+      px1.set(x,ver);
     }
     else if (strcmp(argv[1],"volatile") == 0) {
       cout<<"loading Persistent<X,ST_MEM> px2"<<endl;
       listvar<X,ST_MEM>(px2);
+      __int128 ver = (__int128)0L;
       X x;
       x.x = 1;
-      px2.set(x);
+      px2.set(x,ver++);
       cout<<"after set 1"<<endl;
       listvar<X,ST_MEM>(px2);
       x.x = 10;
-      px2.set(x);
+      px2.set(x,ver++);
       cout<<"after set 10"<<endl;
       listvar<X,ST_MEM>(px2);
       x.x = 100;
-      px2.set(x);
+      px2.set(x,ver++);
       cout<<"after set 100"<<endl;
       listvar<X,ST_MEM>(px2);
     }

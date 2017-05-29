@@ -28,7 +28,7 @@ include_directories(dependencies/mutils dependencies/mutils-serialization depend
 link_directories(dependencies/mutils dependencies/mutils-serialization)
 
 # add_library(persistent Persistent.hpp PersistLog.cpp PersistLog.hpp FilePersistLog.cpp FilePersistLog.hpp MemLog.cpp MemLog.hpp)
-add_library(persistent Persistent.hpp PersistLog.cpp PersistLog.hpp FilePersistLog.cpp FilePersistLog.hpp MemLog.cpp MemLog.hpp HLC.cpp HLC.hpp)
+add_library(persistent Persistent.hpp PersistLog.cpp PersistLog.hpp FilePersistLog.cpp FilePersistLog.hpp HLC.cpp HLC.hpp)
 output_directory(persistent target/usr/local/lib)
 
 add_executable(ptst test.cpp)

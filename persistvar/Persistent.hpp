@@ -6,12 +6,12 @@
 #include <string>
 #include <iostream>
 #include <memory>
+#include <functional>
 #include <pthread.h>
 #include "HLC.hpp"
 #include "PersistException.hpp"
 #include "PersistLog.hpp"
 #include "FilePersistLog.hpp"
-#include "MemLog.hpp"
 #include "SerializationSupport.hpp"
 
 using namespace mutils;
@@ -37,6 +37,12 @@ namespace ns_persistent {
   #define GET_CACHED_OBJ_PTR(v) (this->m_aCache[VERSION_HASH(v)].obj)
   */
 
+  // function types to be registered for create version
+  // or persist version
+  using VersionFunc = std::function<void(const __int128 &)>;
+  using PersistFunc = std::function<void(void)>;
+  using FuncRegisterCallback = std::function<void(VersionFunc,PersistFunc)>;
+
   // Persistent represents a variable backed up by persistent storage. The
   // backend is PersistLog class. PersistLog handles only raw bytes and this
   // class is repsonsible for converting it back and forth between raw bytes
@@ -59,51 +65,67 @@ namespace ns_persistent {
   // - StorageType: storage type is defined in PersistLog. The value could be
   //   ST_FILE/ST_MEM/ST_3DXP ... I will start with ST_FILE and extend it to
   //   other persistent Storage.
+  // TODO:comments
   template <typename ObjectType,
     StorageType storageType=ST_FILE>
   class Persistent{
   public:
-      // constructor: this will guess the objectname from ObjectType
-      Persistent<ObjectType,storageType>() noexcept(false): 
-        Persistent<ObjectType,storageType>(
-          *(Persistent<ObjectType,storageType>::getNameMaker().make())
-        ){};
-      // constructor: this will create a persisted variable. It will be
-      // loaded from persistent storage defined by st, if it is already
-      // defined there, otherwise a new variable as well as its persistent
-      // representation is created.
-      // - objectName: name of the given object.
-      Persistent<ObjectType,storageType>(const char * objectName) noexcept(false){
-        // Initialize log
+      /** The constructor
+       * @param func_register_cb Call this to register myself to Replicated<T>
+       * @param object_name This name is used for persistent data in file.
+       */
+      Persistent(FuncRegisterCallback func_register_cb=nullptr,
+        const char * object_name = (*Persistent::getNameMaker().make()).c_str())
+        noexcept(false) {
+         // Initialize log
         this->m_pLog = NULL;
         switch(storageType){
-
         // file system
         case ST_FILE:
-          this->m_pLog = new FilePersistLog(objectName);
+          this->m_pLog = new FilePersistLog(object_name);
           if(this->m_pLog == NULL){
             throw PERSIST_EXP_NEW_FAILED_UNKNOWN;
           }
           break;
         // volatile
         case ST_MEM:
-          this->m_pLog = new MemLog(objectName);
+        {
+          const string tmpfsPath = "/dev/shm/volatile_t";
+          this->m_pLog = new FilePersistLog(object_name, tmpfsPath);
           if(this->m_pLog == NULL){
             throw PERSIST_EXP_NEW_FAILED_UNKNOWN;
           }
           break;
-
+        }
+        //default
         default:
           throw PERSIST_EXP_STORAGE_TYPE_UNKNOWN(storageType);
         }
-      };
+        //register the version creator and persist callback
+        if(func_register_cb != nullptr){
+          func_register_cb(
+            std::bind(&Persistent<ObjectType,storageType>::version,this,std::placeholders::_1),
+            std::bind(&Persistent<ObjectType,storageType>::persist,this)
+        );
+        }
+      }
       // destructor: release the resources
-      virtual ~Persistent<ObjectType,storageType>() noexcept(false){
+      virtual ~Persistent() noexcept(false){
         // destroy the in-memory log
         if(this->m_pLog != NULL){
           delete this->m_pLog;
         }
+        //TODO:unregister the version creator and persist callback,
+        // if the Persistent<T> is added to the pool dynamically.
       };
+
+      /**
+       * * operator to get the memory version
+       * @return ObjectType&
+       */
+      ObjectType& operator * (){
+        return this->wrapped_obj;
+      }
 
       // get the latest Value of T. The user lambda will be fed with the latest object
       // zerocopy:this object will not live once it returns.
@@ -113,35 +135,84 @@ namespace ns_persistent {
         const Func& fun, 
         DeserializationManager *dm=nullptr)
         noexcept(false) {
-        return this->get(-1L,fun,dm);
+        return this->getByIndex(-1L,fun,dm);
       };
 
       // get the latest Value of T, returns a unique pointer to the object
       std::unique_ptr<ObjectType> get ( DeserializationManager *dm=nullptr)
         noexcept(false) {
-        return this->get(-1L,dm);
+        return this->getByIndex(-1L,dm);
       };
 
       // get a version of Value T. the user lambda will be fed with the given object
       // zerocopy:this object will not live once it returns.
       // return value is decided by user lambda
       template <typename Func>
-      auto get (
-        int64_t version, 
+      auto getByIndex (
+        int64_t idx, 
         const Func& fun, 
         DeserializationManager *dm=nullptr)
         noexcept(false) {
-        int64_t ver = version;
 
-        if (ver < 0) {
-          ver += this->m_pLog->getLength();
+        int64_t _idx = idx;
+
+        if (_idx < 0) {
+          _idx += this->m_pLog->getLength();
         }
-        if (ver < 0 || ver >= this->m_pLog->getLength() ) {
-          throw PERSIST_EXP_INV_VER(version);
+        if (_idx < 0 || _idx >= this->m_pLog->getLength() ) {
+          throw PERSIST_EXP_INV_ENTRY_IDX(idx);
         }
 
-        return deserialize_and_run<ObjectType>(dm,(char *)this->m_pLog->getEntry(ver),fun);
+        return deserialize_and_run<ObjectType>(dm,(char *)this->m_pLog->getEntryByIndex(_idx),fun);
       };
+
+      // get a version of value T. returns a unique pointer to the object
+      std::unique_ptr<ObjectType> getByIndex(
+        int64_t idx, 
+        DeserializationManager *dm=nullptr)
+        noexcept(false) {
+        int64_t _idx = idx;
+
+        if (_idx < 0) {
+          _idx += this->m_pLog->getLength();
+        }
+        if (_idx < 0 || _idx >= this->m_pLog->getLength() ) {
+          throw PERSIST_EXP_INV_ENTRY_IDX(idx);
+        }
+
+        return from_bytes<ObjectType>(dm,(char const *)this->m_pLog->getEntry(idx));      
+      };
+
+      // get a version of Value T, specified by version. the user lambda will be fed with
+      // an object of T.
+      // zerocopy: this object will not live once it returns.
+      // return value is decided by the user lambda.
+      template <typename Func>
+      auto get (
+        const __int128 & ver,
+        const Func& fun,
+        DeserializationManager *dm=nullptr)
+        noexcept(false) {
+        char * pdat = (char*)this->m_pLog->getEntry(ver);
+        if (pdat == nullptr) {
+          throw PERSIST_EXP_INV_VERSION;
+        }
+        return deserialize_and_run<ObjectType>(dm,pdat,fun);
+      };
+
+      // get a version of value T. specified version.
+      // return a deserialized copy for the variable.
+      std::unique_ptr<ObjectType> get(
+        const __int128 & ver,
+        DeserializationManager *dm=nullptr)
+        noexcept(false) {
+        char const * pdat = (char const *)this->m_pLog->getEntry(ver);
+        if (pdat == nullptr) {
+          throw PERSIST_EXP_INV_VERSION;
+        }
+
+        return from_bytes<ObjectType>(dm,pdat);
+      }
 
       // get a version of Value T, specified by HLC clock. the user lambda will be fed with
       // an object of T.
@@ -160,23 +231,6 @@ namespace ns_persistent {
         return deserialize_and_run<ObjectType>(dm,pdat,fun);
       };
 
-      // get a version of value T. returns a unique pointer to the object
-      std::unique_ptr<ObjectType> get(
-        int64_t version, 
-        DeserializationManager *dm=nullptr)
-        noexcept(false) {
-         int64_t ver = version;
-
-        if (ver < 0) {
-          ver += this->m_pLog->getLength();
-        }
-        if (ver < 0 || ver >= this->m_pLog->getLength() ) {
-          throw PERSIST_EXP_INV_VER(version);
-        }
-
-        return from_bytes<ObjectType>(dm,(char const *)this->m_pLog->getEntry(ver));      
-      };
-
       // get a version of value T. specified by HLC clock.
       std::unique_ptr<ObjectType> get(
         const HLC& hlc,
@@ -191,9 +245,15 @@ namespace ns_persistent {
       }
 
       // syntax sugar: get a specified version of T without DSM
-      std::unique_ptr<ObjectType> operator [](int64_t version)
+      std::unique_ptr<ObjectType> operator [](int64_t idx)
         noexcept(false) {
-        return this->get(version);
+        return this->getByIndex(idx);
+      }
+
+      // syntax sugar: get a specified version of T without DSM
+      std::unique_ptr<ObjectType> operator [](const __int128 ver)
+        noexcept(false) {
+        return this->get(ver);
       }
 
       // syntax sugar: get a specified version of T without DSM
@@ -207,21 +267,36 @@ namespace ns_persistent {
         return this->m_pLog->getLength();
       };
 
-      // set value: this increases the version number by 1.
-      virtual void set(const ObjectType &v, const HLC &mhlc) 
+      // make a version with version and mhlc clock
+      virtual void set(const ObjectType &v, const __int128 & ver, const HLC &mhlc) 
         noexcept(false) {
         auto size = bytes_size(v);
         char buf[size];
         bzero(buf,size);
         to_bytes(v,buf);
-        this->m_pLog->append((void*)buf,size,mhlc);
+        this->m_pLog->append((void*)buf,size,ver,mhlc);
       };
 
-      // set value: this incrases the version number by 1.
-      virtual void set(const ObjectType &v)
+      // make a version with version
+      virtual void set(const ObjectType &v, const __int128 & ver)
         noexcept(false) {
         HLC mhlc; // generate a default timestamp for it.
-        this->set(v,mhlc);
+        this->set(v,ver,mhlc);
+      }
+
+      // make a version
+      virtual void version(const __int128 & ver)
+        noexcept(false) {
+        this->set(this->wrapped_obj,ver);
+      }
+
+      /** persist till version
+       * @param ver version number
+       * @return the given version to be persisted.
+       */
+      virtual const __int128 persist()
+        noexcept(false){
+        return this->m_pLog->persist();
       }
 
       // internal _NameMaker class
@@ -242,7 +317,7 @@ namespace ns_persistent {
         }
 
         // guess a name
-        std::shared_ptr<const char *> make() noexcept(false) {
+        std::unique_ptr<std::string> make() noexcept(false) {
           int cnt;
           if (pthread_spin_lock(&this->m_oLck) != 0) {
             throw PERSIST_EXP_SPIN_LOCK(errno);
@@ -251,9 +326,13 @@ namespace ns_persistent {
           if (pthread_spin_unlock(&this->m_oLck) != 0) {
             throw PERSIST_EXP_SPIN_UNLOCK(errno);
           }
-          char * buf = (char *)malloc((strlen(this->m_sObjectTypeName)+13)/8*8);
+          std::unique_ptr<std::string> ret = std::make_unique<std::string>();
+          //char * buf = (char *)malloc((strlen(this->m_sObjectTypeName)+13)/8*8);
+          char buf[256];
           sprintf(buf,"%s-%d",this->m_sObjectTypeName,cnt);
-          return std::make_shared<const char *>((const char*)buf);
+         // return std::make_shared<const char *>((const char*)buf);
+         *ret = buf;
+         return ret;
         }
 
       private:
@@ -263,6 +342,9 @@ namespace ns_persistent {
       };
 
   private:
+      // wrapped objected
+      ObjectType wrapped_obj;
+      
       // PersistLog
       PersistLog * m_pLog;
 
@@ -277,10 +359,6 @@ namespace ns_persistent {
     static Persistent<ObjectType,storageType>::_NameMaker nameMaker;
     return nameMaker;
   }
-  /* use a static method instead
-  template <typename ObjectType,StorageType storageType>
-    typename Persistent<ObjectType,storageType>::_NameMaker Persistent<ObjectType,storageType>::s_oNameMaker;
-  */
 
   template <typename ObjectType>
   class Volatile: public Persistent<ObjectType,ST_MEM>{
