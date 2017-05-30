@@ -108,7 +108,7 @@ static void eval_write (std::size_t osize, int nops) {
 }
 
 int main(int argc,char ** argv){
-  // spdlog::set_level(spdlog::level::trace);
+  spdlog::set_level(spdlog::level::trace);
 
   if(argc <2){
     printhelp();
