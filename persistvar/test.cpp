@@ -96,6 +96,7 @@ static void eval_write (std::size_t osize, int nops) {
   while(cnt -- > 0) {
     pvar.set(writeMe,ver++);
   }
+  pvar.persist();
   clock_gettime(CLOCK_REALTIME,&te);
   long sec = (te.tv_sec - ts.tv_sec);
   long nsec = sec*1000000000 + te.tv_nsec - ts.tv_nsec;
@@ -147,6 +148,7 @@ int main(int argc,char ** argv){
       X x;
       x.x = v;
       px1.set(x,ver);
+      px1.persist();
     }
     else if (strcmp(argv[1],"volatile") == 0) {
       cout<<"loading Persistent<X,ST_MEM> px2"<<endl;
@@ -155,14 +157,17 @@ int main(int argc,char ** argv){
       X x;
       x.x = 1;
       px2.set(x,ver++);
+      px2.persist();
       cout<<"after set 1"<<endl;
       listvar<X,ST_MEM>(px2);
       x.x = 10;
       px2.set(x,ver++);
+      px2.persist();
       cout<<"after set 10"<<endl;
       listvar<X,ST_MEM>(px2);
       x.x = 100;
       px2.set(x,ver++);
+      px2.persist();
       cout<<"after set 100"<<endl;
       listvar<X,ST_MEM>(px2);
     }

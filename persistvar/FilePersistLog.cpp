@@ -135,6 +135,7 @@ namespace ns_persistent{
           throw PERSIST_EXP_READ_FILE(errno);
         }
         close(fd);
+        *META_HEADER = *META_HEADER_PERS;
       } catch (uint64_t e) {
         FPL_PERS_UNLOCK;
         FPL_UNLOCK;
@@ -195,13 +196,16 @@ namespace ns_persistent{
 
     __DO_VALIDATION;
     FPL_UNLOCK;
+    dbg_trace("{0} append:validate check1 Finished.",this->m_sName);
 
     FPL_WRLOCK;
     //check
     __DO_VALIDATION;
+    dbg_trace("{0} append:validate check2 Finished.",this->m_sName);
 
     // copy data
     memcpy(NEXT_DATA,pdat,size);
+    dbg_trace("{0} append:data is copied to log.",this->m_sName);
 
     // fill the log entry
     NEXT_LOG_ENTRY->fields.ver = ver;
@@ -209,7 +213,7 @@ namespace ns_persistent{
     NEXT_LOG_ENTRY->fields.ofst = NEXT_DATA_OFST;
     NEXT_LOG_ENTRY->fields.hlc_r = mhlc.m_rtc_us;
     NEXT_LOG_ENTRY->fields.hlc_l = mhlc.m_logic;
-/* No Sync
+/* No Sync required here.
     if (msync(ALIGN_TO_PAGE(NEXT_LOG_ENTRY), 
         sizeof(LogEntry) + (((uint64_t)NEXT_LOG_ENTRY) % PAGE_SIZE),MS_SYNC) != 0) {
       FPL_UNLOCK;
@@ -219,15 +223,16 @@ namespace ns_persistent{
 
     // update meta header
     META_HEADER->fields.tail ++;
+    dbg_trace("{0} append:log entry and meta data are updated.",this->m_sName);
 /* No sync
     if (msync(this->m_pMeta,sizeof(MetaHeader),MS_SYNC) != 0) {
       FPL_UNLOCK;
       throw PERSIST_EXP_MSYNC(errno);
     }
 */
+    dbg_trace("{0} append a log ver:{1}.{2} hlc:({3},{4})",this->m_sName, 
+      HIGH__int128(ver), LOW__int128(ver),  mhlc.m_rtc_us, mhlc.m_logic);
     FPL_UNLOCK;
-    dbg_trace("{0} append a log ver:{1}.{2} hlc:({2},{3})",this->m_sName, 
-      (uint64_t)(ver>>64), (uint64_t)(ver&(unsigned __int128)0xffffffffffffffffL),  mhlc.m_rtc_us, mhlc.m_logic);
   }
 
   const __int128 FilePersistLog::persist()

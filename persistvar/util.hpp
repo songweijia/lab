@@ -41,6 +41,9 @@
   ({ __typeof__ (a) _a = (a); \
     __typeof__ (b) _b = (b); \
    _a < _b ? _a : _b; })
+
+#define HIGH__int128(x) (*((uint64_t*)((uint64_t)(&(x))+8)))
+#define LOW__int128(x)  (*((uint64_t*)&(x)))
 // verify the existence of a folder
 // Check if directory exists or not. Create it on absence.
 // return error if creating failed

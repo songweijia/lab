@@ -180,7 +180,7 @@ namespace ns_persistent {
           throw PERSIST_EXP_INV_ENTRY_IDX(idx);
         }
 
-        return from_bytes<ObjectType>(dm,(char const *)this->m_pLog->getEntry(idx));      
+        return from_bytes<ObjectType>(dm,(char const *)this->m_pLog->getEntryByIndex(idx));      
       };
 
       // get a version of Value T, specified by version. the user lambda will be fed with

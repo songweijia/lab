@@ -3,6 +3,7 @@
 
 #include <pthread.h>
 #include <string>
+#include "util.hpp"
 #include "PersistLog.hpp"
 
 namespace ns_persistent {
@@ -53,7 +54,7 @@ namespace ns_persistent {
   ///// READ or WRITE LOCK on LOG REQUIRED to use the following MACROs!!!!
   #define META_HEADER           ((MetaHeader*)(&(this->m_currMetaHeader)))
   #define META_HEADER_PERS      ((MetaHeader*)(&(this->m_persMetaHeader)))
-  #define LOG_ENTRY_ARRAY       ((LogEntry*)(&(this->m_pLog)))
+  #define LOG_ENTRY_ARRAY       ((LogEntry*)(this->m_pLog))
 
   #define NUM_USED_SLOTS        (META_HEADER->fields.tail - META_HEADER->fields.head)
   // #define NUM_USED_SLOTS_PERS   (META_HEADER_PERS->tail - META_HEADER_PERS->head)
@@ -123,6 +124,7 @@ namespace ns_persistent {
       if (pthread_rwlock_wrlock(&this->m_rwlock) != 0) { \
         throw PERSIST_EXP_RWLOCK_WRLOCK(errno); \
       } \
+      dbg_trace("FPL_WRLOCK"); \
     } while (0)
 
     #define FPL_RDLOCK \
@@ -130,6 +132,7 @@ namespace ns_persistent {
       if (pthread_rwlock_rdlock(&this->m_rwlock) != 0) { \
         throw PERSIST_EXP_RWLOCK_WRLOCK(errno); \
       } \
+      dbg_trace("FPL_RDLOCK"); \
     } while (0)
 
     #define FPL_UNLOCK \
@@ -137,6 +140,7 @@ namespace ns_persistent {
       if (pthread_rwlock_unlock(&this->m_rwlock) != 0) { \
         throw PERSIST_EXP_RWLOCK_UNLOCK(errno); \
       } \
+      dbg_trace("FPL_UNLOCK"); \
     } while (0)
 
     #define FPL_PERS_LOCK \
@@ -144,6 +148,7 @@ namespace ns_persistent {
       if (pthread_mutex_lock(&this->m_perslock) != 0) { \
         throw PERSIST_EXP_MUTEX_LOCK(errno); \
       } \
+      dbg_trace("PERS_LOCK"); \
     } while (0)
 
     #define FPL_PERS_UNLOCK \
@@ -151,6 +156,7 @@ namespace ns_persistent {
       if (pthread_mutex_unlock(&this->m_perslock) != 0) { \
         throw PERSIST_EXP_MUTEX_UNLOCK(errno); \
       } \
+      dbg_trace("PERS_UNLOCK"); \
     } while (0)
 
  
@@ -219,6 +225,16 @@ namespace ns_persistent {
       FPL_UNLOCK;
     }
 
+  private:
+#ifdef _DEBUG
+    //dbg functions
+    void dbgDumpMeta() {
+      dbg_trace("m_pData={0},m_pLog={1}",(void*)this->m_pData,(void*)this->m_pLog);
+      dbg_trace("MEAT_HEADER:head={0},tail={1}",(int64_t)META_HEADER->fields.head,(int64_t)META_HEADER->fields.tail);
+      dbg_trace("MEAT_HEADER_PERS:head={0},tail={1}",(int64_t)META_HEADER_PERS->fields.head,(int64_t)META_HEADER_PERS->fields.tail);
+      dbg_trace("NEXT_LOG_ENTRY={0},NEXT_LOG_ENTRY_PERS={1}",(void*)NEXT_LOG_ENTRY,(void*)NEXT_LOG_ENTRY_PERS);
+    }
+#endif
   };
 }
 
