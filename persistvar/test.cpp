@@ -68,8 +68,6 @@ Persistent<X> px1;
 Volatile<X> px2; 
 Persistent<X> pxarr[3]; //unused
 
-
-
 template <typename OT, StorageType st=ST_FILE>
 void listvar(Persistent<OT,st> &var){
   int64_t nv = var.getNumOfVersions();

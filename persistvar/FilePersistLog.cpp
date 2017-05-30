@@ -454,7 +454,7 @@ namespace ns_persistent{
     static const string swpFile = this->m_sMetaFile + "." + SWAP_FILE_SUFFIX;
    
     // STEP 2: write current meta header to swap file
-    int fd = open(swpFile.c_str(),O_RDWR);
+    int fd = open(swpFile.c_str(),O_RDWR|O_CREAT,S_IWUSR|S_IRUSR|S_IRGRP|S_IWGRP|S_IROTH);
     if (fd == -1) {
       throw PERSIST_EXP_OPEN_FILE(errno);
     }
