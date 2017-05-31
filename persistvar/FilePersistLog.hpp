@@ -219,7 +219,7 @@ namespace ns_persistent {
       if (tail < head) tail += MAX_LOG_ENTRY;
       idx = binarySearch<TKey>(keyGetter,key,head,tail);
       if (idx != -1) {
-        META_HEADER->fields.head += (idx-head);
+        META_HEADER->fields.head += (idx-head+1);
       } else {
         FPL_UNLOCK;
         return;

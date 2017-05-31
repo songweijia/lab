@@ -227,6 +227,7 @@ int main(int argc,char ** argv){
     }
   }catch (unsigned long long exp){
     cerr<<"Exception captured:0x"<<std::hex<<exp<<endl;
+    return -1;
   }
 
   return 0;

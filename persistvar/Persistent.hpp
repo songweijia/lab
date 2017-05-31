@@ -153,17 +153,7 @@ namespace ns_persistent {
         const Func& fun, 
         DeserializationManager *dm=nullptr)
         noexcept(false) {
-
-        int64_t _idx = idx;
-
-        if (_idx < 0) {
-          _idx += this->m_pLog->getLength();
-        }
-        if (_idx < 0 || _idx >= this->m_pLog->getLength() ) {
-          throw PERSIST_EXP_INV_ENTRY_IDX(idx);
-        }
-
-        return deserialize_and_run<ObjectType>(dm,(char *)this->m_pLog->getEntryByIndex(_idx),fun);
+        return deserialize_and_run<ObjectType>(dm,(char *)this->m_pLog->getEntryByIndex(idx),fun);
       };
 
       // get a version of value T. returns a unique pointer to the object
@@ -171,15 +161,6 @@ namespace ns_persistent {
         int64_t idx, 
         DeserializationManager *dm=nullptr)
         noexcept(false) {
-        int64_t _idx = idx;
-
-        if (_idx < 0) {
-          _idx += this->m_pLog->getLength();
-        }
-        if (_idx < 0 || _idx >= this->m_pLog->getLength() ) {
-          throw PERSIST_EXP_INV_ENTRY_IDX(idx);
-        }
-
         return from_bytes<ObjectType>(dm,(char const *)this->m_pLog->getEntryByIndex(idx));      
       };
 
