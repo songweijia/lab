@@ -50,7 +50,8 @@ public:
 
 static void printhelp(){
   cout << "usage:" << endl;
-  cout << "\tget <version>" << endl;
+  cout << "\tgetbyidx <index>" << endl;
+  cout << "\tgetbyver <version>" << endl;
   cout << "\tgetbytime <timestamp>" << endl;
   cout << "\tset value version" << endl;
   cout << "\tlist" << endl;
@@ -123,7 +124,7 @@ int main(int argc,char ** argv){
       cout<<"Persistent<X,ST_MEM> px2:"<<endl;
       listvar<X,ST_MEM>(px2);
     } 
-    else if (strcmp(argv[1],"get") == 0){
+    else if (strcmp(argv[1],"getbyidx") == 0){
       int64_t nv = atol(argv[2]);
       // by lambda
       px1.getByIndex(nv,
@@ -132,6 +133,16 @@ int main(int argc,char ** argv){
         });
       // by copy
       cout<<"["<<nv<<"]\t"<<px1.getByIndex(nv)->x<<"\t//by copy"<<endl;
+    }
+    else if (strcmp(argv[1],"getbyver") == 0){
+      __int128 ver = atoi(argv[2]);
+      // by lambda
+      px1.get(ver,
+        [&](X& x) { 
+          cout<<"["<<(uint64_t)(ver>>64)<<"."<<(uint64_t)ver<<"]\t"<<x.x<<"\t//by lambda"<<endl;
+        });
+      // by copy
+      cout<<"["<<(uint64_t)(ver>>64)<<"."<<(uint64_t)ver<<"]\t"<<px1.get(ver)->x<<"\t//by copy"<<endl;
     }
     else if (strcmp(argv[1],"getbytime") == 0){
       HLC hlc;
