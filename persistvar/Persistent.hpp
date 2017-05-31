@@ -214,6 +214,13 @@ namespace ns_persistent {
         return from_bytes<ObjectType>(dm,pdat);
       }
 
+      template <typename TKey>
+      void trim (const TKey &k) noexcept(false) {
+        dbg_trace("trim.");
+        this->m_pLog->trim(k);
+        dbg_trace("trim...done");
+      }
+
       // get a version of Value T, specified by HLC clock. the user lambda will be fed with
       // an object of T.
       // zerocopy: this object will not live once it returns.

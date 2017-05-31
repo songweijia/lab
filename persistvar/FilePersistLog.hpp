@@ -39,15 +39,17 @@ namespace ns_persistent {
       uint64_t hlc_r;   // realtime component of hlc
       uint64_t hlc_l;   // logic component of hlc
     } fields;
-    uint8_t bytes[48];
+    uint8_t bytes[64];
   } LogEntry;
 
   // TODO: make this hard-wired number configurable.
   // Currently, we allow 16383(2^14-1) log entries and
   // 16M data size.
-  #define MAX_LOG_ENTRY         (1UL<<14)
+  // #define MAX_LOG_ENTRY         (1UL<<14)
+  #define MAX_LOG_ENTRY         (1UL<<6)
   #define MAX_LOG_SIZE          (sizeof(LogEntry)*MAX_LOG_ENTRY)
-  #define MAX_DATA_SIZE         (1UL<<26)
+  // #define MAX_DATA_SIZE         (1UL<<26)
+  #define MAX_DATA_SIZE         (1UL<<12)
   #define META_SIZE             (sizeof(MetaHeader))
 
   // helpers:

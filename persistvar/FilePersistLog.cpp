@@ -40,13 +40,18 @@ namespace ns_persistent{
     m_iDataFileDesc(-1),
     m_pLog(MAP_FAILED),
     m_pData(MAP_FAILED) {
+#ifdef _DEBUG
+    spdlog::set_level(spdlog::level::trace);
+#endif
     if (pthread_rwlock_init(&this->m_rwlock,NULL) != 0) {
       throw PERSIST_EXP_RWLOCK_INIT(errno);
     }
     if (pthread_mutex_init(&this->m_perslock,NULL) != 0) {
       throw PERSIST_EXP_MUTEX_INIT(errno);
     }
+    dbg_trace("{0} constructor: before load()",name);
     load();
+    dbg_trace("{0} constructor: after load()",name);
   }
 
   void FilePersistLog::load()
@@ -79,11 +84,11 @@ namespace ns_persistent{
       throw PERSIST_EXP_MMAP_FILE(errno);
     }
     if(mmap(this->m_pLog,MAX_LOG_SIZE,PROT_READ|PROT_WRITE,MAP_SHARED|MAP_FIXED,this->m_iLogFileDesc,0) == MAP_FAILED) {
-      dbg_trace("{0}:map ringbuffer space for the first half of log failed.", this->m_sName);
+      dbg_trace("{0}:map ringbuffer space for the first half of log failed. Is the size of log ringbuffer aligned to page?", this->m_sName);
       throw PERSIST_EXP_MMAP_FILE(errno);
     }
     if(mmap((void*)((uint64_t)this->m_pLog+MAX_LOG_SIZE),MAX_LOG_SIZE,PROT_READ|PROT_WRITE,MAP_SHARED|MAP_FIXED,this->m_iLogFileDesc,0) == MAP_FAILED) {
-      dbg_trace("{0}:map ringbuffer space for the second half of log failed.", this->m_sName);
+      dbg_trace("{0}:map ringbuffer space for the second half of log failed. Is the size of log ringbuffer aligned to page?", this->m_sName);
       throw PERSIST_EXP_MMAP_FILE(errno);
     }
     //// data ringbuffer
@@ -93,11 +98,11 @@ namespace ns_persistent{
       throw PERSIST_EXP_MMAP_FILE(errno);
     }
     if(mmap(this->m_pData,MAX_DATA_SIZE,PROT_READ|PROT_WRITE,MAP_SHARED|MAP_FIXED,this->m_iDataFileDesc,0) == MAP_FAILED) {
-      dbg_trace("{0}:map ringbuffer space for the first half of data failed.", this->m_sName);
+      dbg_trace("{0}:map ringbuffer space for the first half of data failed. Is the size of data ringbuffer aligned to page?", this->m_sName);
       throw PERSIST_EXP_MMAP_FILE(errno);
     }
     if(mmap((void*)((uint64_t)this->m_pData + MAX_DATA_SIZE),MAX_DATA_SIZE,PROT_READ|PROT_WRITE,MAP_SHARED|MAP_FIXED,this->m_iDataFileDesc,0) == MAP_FAILED) {
-      dbg_trace("{0}:map ringbuffer space for the second half of data failed.", this->m_sName);
+      dbg_trace("{0}:map ringbuffer space for the second half of data failed. Is the size of data ringbuffer aligned to page?", this->m_sName);
       throw PERSIST_EXP_MMAP_FILE(errno);
     }
     dbg_trace("{0}:data/meta file mapped to memory",this->m_sName);
@@ -251,6 +256,7 @@ namespace ns_persistent{
     }
 
     //flush data
+    dbg_trace("{0} flush data,log,and meta.", this->m_sName);
     try {
       if ((NUM_USED_SLOTS > 0) && 
           (NEXT_LOG_ENTRY > NEXT_LOG_ENTRY_PERS)){
@@ -258,12 +264,17 @@ namespace ns_persistent{
           LOG_ENTRY_AT(CURR_LOG_IDX)->fields.dlen - 
           NEXT_LOG_ENTRY_PERS->fields.ofst);
         // flush data
-        if (msync(NEXT_DATA_PERS,flush_len,MS_SYNC) != 0) {
+        void * flush_start;
+        flush_start = ALIGN_TO_PAGE(NEXT_DATA_PERS);
+        flush_len += ((int64_t)NEXT_DATA_PERS)%PAGE_SIZE;
+        if (msync(flush_start,flush_len,MS_SYNC) != 0) {
           throw PERSIST_EXP_MSYNC(errno);
         }
         // flush log
-        if (msync((void*)NEXT_LOG_ENTRY_PERS,
-          ((size_t)NEXT_LOG_ENTRY-(size_t)NEXT_LOG_ENTRY_PERS),MS_SYNC) != 0) {
+        flush_start = ALIGN_TO_PAGE(NEXT_LOG_ENTRY_PERS);
+        flush_len = ((size_t)NEXT_LOG_ENTRY-(size_t)NEXT_LOG_ENTRY_PERS) + 
+          ((int64_t)NEXT_LOG_ENTRY_PERS)%PAGE_SIZE;
+        if (msync(flush_start,flush_len,MS_SYNC) != 0) {
           throw PERSIST_EXP_MSYNC(errno);
         }
       }
@@ -274,6 +285,7 @@ namespace ns_persistent{
       FPL_UNLOCK;
       throw e;
     }
+    dbg_trace("{0} flush data,log,and meta...done.", this->m_sName);
 
     //get the latest flushed version
     if (NUM_USED_SLOTS > 0) {
@@ -299,16 +311,26 @@ namespace ns_persistent{
     noexcept(false) {
 
     FPL_RDLOCK;
-    if (META_HEADER->fields.tail <= eidx || (eidx + META_HEADER->fields.tail) < META_HEADER->fields.head ) {
+    dbg_trace("{0}-getEntryByIndex-head:{1},tail:{2},eidx:{3}",
+      this->m_sName,META_HEADER->fields.head,META_HEADER->fields.tail,eidx);
+
+    int64_t ridx = (eidx < 0)?(META_HEADER->fields.tail + eidx):eidx;
+
+    if (META_HEADER->fields.tail <= ridx || ridx < META_HEADER->fields.head ) {
       FPL_UNLOCK;
       throw PERSIST_EXP_INV_ENTRY_IDX(eidx);
     }
-    int64_t ridx = (eidx < 0)?(META_HEADER->fields.tail + eidx):eidx;
     FPL_UNLOCK;
 
-    dbg_trace("{0} getEntry at ({1},{2})",this->m_sName,(LOG_ENTRY_ARRAY + ridx)->fields.hlc_r,(LOG_ENTRY_ARRAY + ridx)->fields.hlc_l);
+    dbg_trace("{0} getEntryByIndex at idx:{1} ver:{2}.{3} time:({4},{5})",
+     this->m_sName,
+       ridx,
+       (int64_t)(LOG_ENTRY_AT(ridx)->fields.ver>>64),
+       (int64_t)(LOG_ENTRY_AT(ridx)->fields.ver),
+       (LOG_ENTRY_AT(ridx))->fields.hlc_r,
+       (LOG_ENTRY_AT(ridx))->fields.hlc_l);
 
-    return LOG_ENTRY_DATA(LOG_ENTRY_ARRAY + ridx);
+    return LOG_ENTRY_DATA(LOG_ENTRY_AT(ridx));
   }
 
   // binary search through the log
@@ -422,6 +444,7 @@ namespace ns_persistent{
 
   // trim by index
   void FilePersistLog::trim(const int64_t &idx) noexcept(false) {
+    dbg_trace("{0} trim at index: {1}",this->m_sName,idx);
     FPL_RDLOCK;
     // validate check
     if (idx < META_HEADER->fields.head || idx >= META_HEADER->fields.tail){
@@ -438,20 +461,25 @@ namespace ns_persistent{
     }
     META_HEADER->fields.head = idx + 1;
     FPL_UNLOCK;
+    dbg_trace("{0} trim at index: {1}...done",this->m_sName,idx);
   }
 
   void FilePersistLog::trim(const __int128 &ver) noexcept(false) {
+    dbg_trace("{0} trim at version: {1}.{2}",this->m_sName,(int64_t)(ver>>64),(int64_t)ver);
     this->trim<__int128>(ver,
       [&](int64_t idx){return LOG_ENTRY_AT(idx)->fields.ver;});
+    dbg_trace("{0} trim at version: {1}.{2}...done",this->m_sName,(int64_t)(ver>>64),(int64_t)ver);
   }
 
   void FilePersistLog::trim(const HLC & hlc) noexcept(false) {
+    dbg_trace("{0} trim at time: {1}.{2}",this->m_sName,hlc.m_rtc_us,hlc.m_logic);
     this->trim<unsigned __int128>(
       ((((const unsigned __int128)hlc.m_rtc_us)<<64) | hlc.m_logic),
       [&](int64_t idx) {
         return ((((const unsigned __int128)LOG_ENTRY_AT(idx)->fields.hlc_r)<<64) | 
           LOG_ENTRY_AT(idx)->fields.hlc_l);
       });
+    dbg_trace("{0} trim at time: {1}.{2}...done",this->m_sName,hlc.m_rtc_us,hlc.m_logic);
   }
 
   void FilePersistLog::persistMetaHeaderAtomically() noexcept(false) {

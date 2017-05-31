@@ -54,6 +54,9 @@ static void printhelp(){
   cout << "\tgetbyver <version>" << endl;
   cout << "\tgetbytime <timestamp>" << endl;
   cout << "\tset value version" << endl;
+  cout << "\ttrimbyidx <index>" << endl;
+  cout << "\ttrimbyver <version>" << endl;
+  cout << "\ttrimbytime <time>" << endl;
   cout << "\tlist" << endl;
   cout << "\tvolatile" << endl;
   cout << "\thlc" << endl;
@@ -152,6 +155,26 @@ int main(int argc,char ** argv){
         [&](X& x) {
           cout<<"[("<<hlc.m_rtc_us<<",0)]\t"<<x.x<<"\t//bylambda"<<endl;
         });
+    }
+    else if(strcmp(argv[1],"trimbyidx") == 0){
+      int64_t nv = atol(argv[2]);
+      px1.trim(nv);
+      px1.persist();
+      cout<<"trim till index "<<nv<<" successfully"<<endl;
+    }
+    else if(strcmp(argv[1],"trimbyver") == 0){
+      __int128 ver = atol(argv[2]);
+      px1.trim(ver);
+      px1.persist();
+      cout<<"trim till ver "<<(int64_t)(ver>>64)<<"."<<(int64_t)ver<<" successfully"<<endl;
+    }
+    else if(strcmp(argv[1],"trimbytime") == 0){
+      HLC hlc;
+      hlc.m_rtc_us = atol(argv[2]);
+      hlc.m_logic = 0;
+      px1.trim(hlc);
+      px1.persist();
+      cout<<"trim till time "<<hlc.m_rtc_us<<" successfully"<<endl;
     }
     else if (strcmp(argv[1],"set") == 0) {
       int v = atoi(argv[2]);
