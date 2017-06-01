@@ -38,7 +38,9 @@ namespace ns_persistent{
   #define PERSIST_EXP_READ_FILE(x)                      PERSIST_EXP(27,(x))
   #define PERSIST_EXP_WRITE_FILE(x)                     PERSIST_EXP(28,(x))
   #define PERSIST_EXP_RENAME_FILE(x)                    PERSIST_EXP(29,(x))
-  #define PERSIST_EXP_NOSPACE                           PERSIST_EXP(30,0)
+  #define PERSIST_EXP_NOSPACE(x)                        PERSIST_EXP(30,(x))
+  #define PERSIST_EXP_NOSPACE_LOG                       PERSIST_EXP_NOSPACE(1)
+  #define PERSIST_EXP_NOSPACE_DATA                      PERSIST_EXP_NOSPACE(2)
 }
 
 #endif//PERSISTENT_EXCEPTION_HPP

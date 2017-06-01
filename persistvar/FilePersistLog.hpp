@@ -78,11 +78,11 @@ namespace ns_persistent {
   #define NEXT_DATA_PERS        ((NEXT_LOG_ENTRY > NEXT_LOG_ENTRY_PERS) ? \
     LOG_ENTRY_DATA(NEXT_LOG_ENTRY_PERS) : NULL)
 
-  #define NUM_USED_BYTES        (NUM_USED_SLOTS > 0)? 0 : \
+  #define NUM_USED_BYTES        ((NUM_USED_SLOTS == 0)? 0 : \
     ( LOG_ENTRY_AT(CURR_LOG_IDX)->fields.ofst + \
-      LOG_ENTRY_AT(CURR_LOG_IDX)->fields.len - \
-      LOG_ENTRY_AT(META_HEADER->fields.head)->ofst )
-  #define NUM_FREE_BYTES        (MAX_DATA_SIZE - NUM_USED_SLOTS)
+      LOG_ENTRY_AT(CURR_LOG_IDX)->fields.dlen - \
+      LOG_ENTRY_AT(META_HEADER->fields.head)->fields.ofst ))
+  #define NUM_FREE_BYTES        (MAX_DATA_SIZE - NUM_USED_BYTES)
 
   #define PAGE_SIZE             (getpagesize())
   #define ALIGN_TO_PAGE(x)      ((void *)(((uint64_t)(x))-((uint64_t)(x))%PAGE_SIZE))
@@ -186,6 +186,7 @@ namespace ns_persistent {
       const uint64_t & size, const __int128 & ver,
       const HLC &mhlc) noexcept(false);
     virtual int64_t getLength() noexcept(false);
+    virtual int64_t getEarliestIndex() noexcept(false);
     virtual const void* getEntryByIndex(const int64_t &eno) noexcept(false);
     virtual const void* getEntry(const __int128 & ver) noexcept(false);
     virtual const void* getEntry(const HLC &hlc) noexcept(false);

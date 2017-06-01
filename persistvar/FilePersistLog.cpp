@@ -188,12 +188,21 @@ namespace ns_persistent{
 
 #define __DO_VALIDATION \
     do { \
-      if (NUM_FREE_SLOTS < 1 || NUM_FREE_BYTES < size) { \
+      if (NUM_FREE_SLOTS < 1 ) { \
         FPL_UNLOCK; \
-        throw PERSIST_EXP_NOSPACE; \
+        throw PERSIST_EXP_NOSPACE_LOG; \
+      } \
+      if (NUM_FREE_BYTES < size) { \
+        dbg_trace("{0}-append exception no space for data: NUM_FREE_BYTES={1}, size={2}", \
+          this->m_sName, NUM_FREE_BYTES, size); \
+        FPL_UNLOCK; \
+        throw PERSIST_EXP_NOSPACE_DATA; \
       } \
       if ((CURR_LOG_IDX != -1) && \
           (LOG_ENTRY_AT(CURR_LOG_IDX)->fields.ver >= ver)) { \
+        __int128 cver = LOG_ENTRY_AT(CURR_LOG_IDX)->fields.ver; \
+        dbg_trace("{0}-append cur_ver:{1}.{2} new_ver:{3}.{4}", this->m_sName, \
+          (int64_t)(cver>>64),(int64_t)cver,(int64_t)(ver>>64),(int64_t)ver); \
         FPL_UNLOCK; \
         throw PERSIST_EXP_INV_VERSION; \
       } \
@@ -305,6 +314,14 @@ namespace ns_persistent{
     FPL_UNLOCK;
 
     return len;
+  }
+
+  int64_t FilePersistLog::getEarliestIndex ()
+  noexcept(false) {
+    FPL_RDLOCK;
+    int64_t idx = (NUM_FREE_SLOTS == 0)? INVALID_INDEX:META_HEADER->fields.head;
+    FPL_UNLOCK;
+    return idx;
   }
 
   const void * FilePersistLog::getEntryByIndex (const int64_t &eidx)

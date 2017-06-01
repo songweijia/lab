@@ -24,6 +24,7 @@ namespace ns_persistent {
   };
 
   #define INVALID_VERSION ((__int128)-1L)
+  #define INVALID_INDEX INT64_MAX
 
   // Persistent log interfaces
   class PersistLog{
@@ -54,6 +55,9 @@ namespace ns_persistent {
 
     // Get the length of the log 
     virtual int64_t getLength() noexcept(false) = 0;
+
+    // Get the Earliest Index
+    virtual int64_t getEarliestIndex() noexcept(false) = 0;
 
     // Get a version by entry number
     virtual const void* getEntryByIndex(const int64_t & eno) noexcept(false) = 0;

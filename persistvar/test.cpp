@@ -46,6 +46,18 @@ public:
   virtual void ensure_registered(DeserializationManager &dsm) {
     // do nothing, we don't need DSM.
   };
+
+  virtual const char* to_string(){
+    return buf;
+  };
+  
+  static std::unique_ptr<VariableBytes> from_bytes(DeserializationManager *dsm, char const * const v) {
+    VariableBytes vb;
+    std::unique_ptr<VariableBytes> pvb = std::make_unique<VariableBytes>();
+    strcpy(pvb->buf,v);
+    pvb->data_len = strlen(v)+1;
+    return pvb;
+  };
 };
 
 static void printhelp(){
@@ -68,6 +80,7 @@ static void printhelp(){
 }
 
 Persistent<X> px1;
+Persistent<VariableBytes> npx;
 //Persistent<X,ST_MEM> px2; 
 Volatile<X> px2; 
 Persistent<X> pxarr[3]; //unused
@@ -75,15 +88,19 @@ Persistent<X> pxarr[3]; //unused
 template <typename OT, StorageType st=ST_FILE>
 void listvar(Persistent<OT,st> &var){
   int64_t nv = var.getNumOfVersions();
+  int64_t idx = var.getEarliestIndex();
   cout<<"Number of Versions:\t"<<nv<<endl;
-  while(nv-- > 0){
+  while (nv--) {
+/*
     // by lambda
     var.getByIndex(nv,
       [&](OT& x) {
         cout<<"["<<nv<<"]\t"<<x.to_string()<<"\t//by lambda"<<endl;
       });
+*/
     // by copy
-    cout<<"["<<nv<<"]\t"<<var.getByIndex(nv)->to_string()<<"\t//by copy"<<endl;
+    cout<<"["<<idx<<"]\t"<<var.getByIndex(idx)->to_string()<<"\t//by copy"<<endl;
+    idx++;
   }
 }
 
@@ -122,67 +139,74 @@ int main(int argc,char ** argv){
 
   try{
     if (strcmp(argv[1],"list") == 0) {
-      cout<<"Persistent<X> px1:"<<endl;
-      listvar<X>(px1);
-      cout<<"Persistent<X,ST_MEM> px2:"<<endl;
-      listvar<X,ST_MEM>(px2);
+      cout<<"Persistent<VariableBytes> npx:"<<endl;
+      listvar<VariableBytes>(npx);
+      //cout<<"Persistent<X,ST_MEM> px2:"<<endl;
+      //listvar<X,ST_MEM>(px2);
     } 
     else if (strcmp(argv[1],"getbyidx") == 0){
       int64_t nv = atol(argv[2]);
       // by lambda
-      px1.getByIndex(nv,
-        [&](X& x) { 
-          cout<<"["<<nv<<"]\t"<<x.x<<"\t//by lambda"<<endl;
+/*
+      npx.getByIndex(nv,
+        [&](VariableBytes& x) { 
+          cout<<"["<<nv<<"]\t"<<x.to_string()<<"\t//by lambda"<<endl;
         });
+*/
       // by copy
-      cout<<"["<<nv<<"]\t"<<px1.getByIndex(nv)->x<<"\t//by copy"<<endl;
+      cout<<"["<<nv<<"]\t"<<npx.getByIndex(nv)->to_string()<<"\t//by copy"<<endl;
     }
     else if (strcmp(argv[1],"getbyver") == 0){
       __int128 ver = atoi(argv[2]);
+/*
       // by lambda
-      px1.get(ver,
-        [&](X& x) { 
-          cout<<"["<<(uint64_t)(ver>>64)<<"."<<(uint64_t)ver<<"]\t"<<x.x<<"\t//by lambda"<<endl;
+      npx.get(ver,
+        [&](VariableBytes& x) { 
+          cout<<"["<<(uint64_t)(ver>>64)<<"."<<(uint64_t)ver<<"]\t"<<x.to_string()<<"\t//by lambda"<<endl;
         });
+*/
       // by copy
-      cout<<"["<<(uint64_t)(ver>>64)<<"."<<(uint64_t)ver<<"]\t"<<px1.get(ver)->x<<"\t//by copy"<<endl;
+      cout<<"["<<(uint64_t)(ver>>64)<<"."<<(uint64_t)ver<<"]\t"<<npx.get(ver)->to_string()<<"\t//by copy"<<endl;
     }
     else if (strcmp(argv[1],"getbytime") == 0){
       HLC hlc;
       hlc.m_rtc_us = atol(argv[2]);
       hlc.m_logic = 0;
-      px1.get(hlc,
-        [&](X& x) {
-          cout<<"[("<<hlc.m_rtc_us<<",0)]\t"<<x.x<<"\t//bylambda"<<endl;
+/*
+      npx.get(hlc,
+        [&](VariableBytes& x) {
+          cout<<"[("<<hlc.m_rtc_us<<",0)]\t"<<x.to_string()<<"\t//bylambda"<<endl;
         });
+*/
+      cout<<"["<<"[("<<hlc.m_rtc_us<<",0)]\t"<<npx.get(hlc)->to_string()<<"\t//by copy"<<endl;
     }
     else if(strcmp(argv[1],"trimbyidx") == 0){
       int64_t nv = atol(argv[2]);
-      px1.trim(nv);
-      px1.persist();
+      npx.trim(nv);
+      npx.persist();
       cout<<"trim till index "<<nv<<" successfully"<<endl;
     }
     else if(strcmp(argv[1],"trimbyver") == 0){
       __int128 ver = atol(argv[2]);
-      px1.trim(ver);
-      px1.persist();
+      npx.trim(ver);
+      npx.persist();
       cout<<"trim till ver "<<(int64_t)(ver>>64)<<"."<<(int64_t)ver<<" successfully"<<endl;
     }
     else if(strcmp(argv[1],"trimbytime") == 0){
       HLC hlc;
       hlc.m_rtc_us = atol(argv[2]);
       hlc.m_logic = 0;
-      px1.trim(hlc);
-      px1.persist();
+      npx.trim(hlc);
+      npx.persist();
       cout<<"trim till time "<<hlc.m_rtc_us<<" successfully"<<endl;
     }
     else if (strcmp(argv[1],"set") == 0) {
-      int v = atoi(argv[2]);
+      char* v = argv[2];
       __int128 ver = (__int128)atoi(argv[3]);
-      X x;
-      x.x = v;
-      px1.set(x,ver);
-      px1.persist();
+      sprintf((*npx).buf,"%s",v);
+      (*npx).data_len = strlen(v)+1;
+      npx.version(ver);
+      npx.persist();
     }
     else if (strcmp(argv[1],"volatile") == 0) {
       cout<<"loading Persistent<X,ST_MEM> px2"<<endl;
