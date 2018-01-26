@@ -1,7 +1,7 @@
 PROG=gol
 # CFLAGS= -ggdb -DDEBUG -O0
 CFLAGS=-O3
-LDFLAGS=
+LDFLAGS=-pthread
 
 all: ${PROG}
 
