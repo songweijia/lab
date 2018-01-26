@@ -1,0 +1,114 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <errno.h>
+#include <time.h>
+
+/*
+  Shape of a 8x8 World: 
+  The actual space in the world is 6x6
+  # # # # # # # #
+ #              #
+ #              #
+ #              #
+ #              #
+ #              #
+ #              #
+ # # # # # # # #
+ */
+
+// (x,y) are coordination start from 1
+#define STATE(w,x,y,o,shadow) \
+  (w[((y)<<(o))+(x)] & (shadow))
+
+#define L_STATE(w,x,y,o) \
+  (w[((y)<<(o))+(x)])
+
+int step(char *world,int order_of_world,int upper_slot) {
+  char shadow = (upper_slot)?0xf0:0xf;
+  int rshift = (upper_slot)?4:0;
+
+  for (int y = 1; y < ((1<<order_of_world)-1) ; y ++) // y
+  for (int x = 1; x < ((1<<order_of_world)-1) ; x ++) // x
+  {
+    register int sum =
+      STATE(world,x-1,y-1,order_of_world,shadow) +
+      STATE(world,x  ,y-1,order_of_world,shadow) +
+      STATE(world,x+1,y-1,order_of_world,shadow) +
+      STATE(world,x-1,y  ,order_of_world,shadow) +
+      STATE(world,x+1,y  ,order_of_world,shadow) +
+      STATE(world,x-1,y+1,order_of_world,shadow) +
+      STATE(world,x  ,y+1,order_of_world,shadow) +
+      STATE(world,x+1,y+1,order_of_world,shadow);
+    sum = sum>>rshift;
+    if((STATE(world,x,y,order_of_world,shadow) && (sum == 2)) || (sum == 3)){
+      L_STATE(world,x,y,order_of_world) = STATE(world,x,y,order_of_world,shadow) | (char)(1<<(4-rshift)); // live
+    } else {
+      L_STATE(world,x,y,order_of_world) = STATE(world,x,y,order_of_world,shadow); // die
+    }
+  }
+  return 0;
+}
+
+//
+int initialize(char **world, int order_of_world) {
+  long side_length_with_margin = 1<<order_of_world;
+  long world_space_with_margin = side_length_with_margin<<order_of_world;
+  *world = (char*)malloc(world_space_with_margin);
+  if (world == NULL) {
+    fprintf(stderr, "cannot allocate space for the world:error=%d.\n",errno);
+    return errno;
+  }
+
+  time_t t;
+  time(&t);
+  srand(t);
+
+  //initialize
+  for(int i=0;i<(world_space_with_margin);i++){
+    char r = (char)rand();
+    if(r&0xf)
+      (*world)[i] = (char)0x1;
+    if(r&0xf0)
+      (*world)[i] = (char)0x10;
+  }
+
+  return 0;
+}
+
+int destroy(char **world){
+  if(*world != NULL){
+    free(*world);
+    *world = NULL;
+  }
+  return 0;
+}
+
+int main(int argc, char **argv) {
+  if(argc < 3) {
+    printf("USAGE: %s <N:2^N,2^N> <Generation>\n",argv[0]);
+    return -1;
+  }
+
+  int order_of_world = atoi(argv[1]);
+  int num_of_generations = atoi(argv[2]);
+  int gcount = num_of_generations;
+  char *world = NULL;
+
+  if(initialize(&world,order_of_world)!=0) {
+    return -1;
+  }
+
+  struct timespec ts,te;
+  clock_gettime(CLOCK_REALTIME,&ts);
+  while(gcount--) {
+    step(world,order_of_world,gcount%2);
+  }
+  clock_gettime(CLOCK_REALTIME,&te);
+
+  ssize_t tot_ns = (te.tv_sec-ts.tv_sec)*1000000000 + (te.tv_nsec-ts.tv_nsec);
+  ssize_t ncell = ((1L<<order_of_world)-2)*((1<<order_of_world)-2);
+  ssize_t nworld = (1L<<(order_of_world*2));
+  printf("%ld KB world;\t throughput = %.3fM cell generation per sec.\n", nworld>>10, (double)ncell*num_of_generations/tot_ns*1000);
+
+  destroy(&world);
+}
