@@ -45,6 +45,14 @@ void dumpWorld(int *world, int lower_slot, int ncol_with_margin, int nrow_with_m
 }
 #endif
 
+void touchWorld(int *world, int ncol_with_margin, int nrow_with_margin){
+  volatile int v;
+  int space = 2*ncol_with_margin*nrow_with_margin;
+  while(--space) {
+    v = world[space];
+  }
+}
+
 int step(int *w1,int *w2, int order_of_ncol,int nrow) {
 #ifdef DEBUG
   int * _world_from = w1;
@@ -191,20 +199,24 @@ void * thread_routine(void * param) {
 #ifdef DEBUG
       printf("Thread waiting for sem@%p\n",&tp->s1);
 #endif
+#ifndef SKIP_SYNC
     if(sem_wait(&tp->s1)){
       printf("error wait for sempahore.\n");
       return NULL;
     }
+#endif
     // 2 - do the work:
     step(direction?tp->w1:tp->w2,direction?tp->w2:tp->w1,tp->order_of_ncol,tp->nrow);
     // 3 - post the direction
 #ifdef DEBUG
       printf("Thread posting to sem@%p\n",tp->ps2);
 #endif
+#ifndef SKIP_SYNC
     if(sem_post(tp->ps2)){
       printf("error post to semaphore.\n");
       return NULL;
     }
+#endif
   };
   return NULL;
 }
@@ -294,25 +306,38 @@ int main(int argc, char **argv) {
 #ifdef DEBUG
       printf("posting to sem@%p\n",&tps[i].s1);
 #endif
+#ifndef SKIP_SYNC
       if(sem_post(&tps[i].s1)) {
         fprintf(stderr,"Failed to post semaphore.errno=%d\n",errno);
         return -1;
       }
+#endif
     }
     // wait for results.
     for(i=0;i<num_of_threads;i++){
 #ifdef DEBUG
       printf("waiting for sem@%p\n",&sem2);
 #endif
+#ifndef SKIP_SYNC
       if(sem_wait(&sem2)) {
         fprintf(stderr,"Failed to wait semaphore.errno=%d\n",errno);
         return -1;
       }
+#endif
     }
   }
 
-  clock_gettime(CLOCK_REALTIME,&te);
+#ifdef SKIP_SYNC
+  for(int i=0;i<num_of_threads;i++){
+    void *ret;
+    pthread_join(ths[i],&ret);
+  }
+#endif
 
+  clock_gettime(CLOCK_REALTIME,&te);
+#ifndef DEBUG
+  touchWorld(world,1<<order_of_ncol,nrow+2);
+#endif
   ssize_t tot_ns = (te.tv_sec-ts.tv_sec)*1000000000 + (te.tv_nsec-ts.tv_nsec);
   ssize_t ncell = ((1L<<order_of_ncol)-2)*nrow;
   ssize_t nworld = (1L<<(order_of_ncol))*(nrow + 2);

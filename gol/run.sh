@@ -8,8 +8,8 @@ do
     do
       for way in 1 3 f ff ffff
       do
-        echo "sudo rdtset -t \"l3=0x${way};cpu=1-${nth}\" -k -c ${nth} nice --20 ./gol 10 $i ${nth} >> data/${nth}-th-${way}-way-output.$l"
-        sudo rdtset -t "l3=0x${way};cpu=1-${nth}" -k -c 1-${nth} nice --20 ./gol 10 $i ${nth} >> data/${nth}-th-${way}-way-output.$l
+        echo "sudo rdtset -t \"l3=0x${way};cpu=1-${nth}\" -k -c 1-${nth} nice --20 ./gol 10 $i ${nth} >> data/${nth}-th-${way}-way-output.$l"
+        sudo rdtset -t "l3=0x${way};cpu=1-${nth}" -k -c 1-${nth} nice --20 ./gol 10 $i ${nth} >> data/cat-mth-no-sem/${nth}-th-${way}-way-output
       done
     done
   done
