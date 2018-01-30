@@ -45,6 +45,46 @@ void dumpWorld(int *world, int lower_slot, int ncol_with_margin, int nrow_with_m
 }
 #endif
 
+#ifdef RAND_TEST
+int* convertIndexToMarginWorld(int *world,int ncol,int nrow){
+  for(int i=0;i<ncol*nrow;i++){
+    int x = world[i]%nrow;
+    int y = world[i]/nrow;
+    world[i] = y*(nrow+2) + x + 1;
+  }
+  return world;
+}
+
+int* createRandTable(int ncol,int nrow){
+  int nworld = ncol*nrow;
+  int* random_map = (int*)malloc(nworld*sizeof(int));
+  char* char_map = (char*)malloc(nworld);
+  if(random_map==NULL || char_map==NULL){
+    fprintf(stderr,"ERROR allocating memory.errno=%d\n",errno);
+    return NULL;
+  }
+
+  memset(char_map,0,nworld);
+  for(int i=0;i<nworld;i++) {
+    int next = rand()%(nworld);
+    while(char_map[next]!=0){
+      next = (next+1)%nworld;
+    }
+    random_map[i] = next;
+    char_map[next] = 1;
+  }
+
+  free(char_map);
+  printf("randomize...done.\n");
+// #ifdef DEBUG
+  for(int i=0;i<nworld;i++) {
+    fprintf(stderr,"%d-%d\n",i,random_map[i]);
+  }
+// #endif
+  return convertIndexToMarginWorld(random_map,ncol,nrow);
+}
+#endif//RAND_TEST
+
 void touchWorld(int *world, int ncol_with_margin, int nrow_with_margin){
   volatile int v;
   int space = 2*ncol_with_margin*nrow_with_margin;
@@ -53,23 +93,11 @@ void touchWorld(int *world, int ncol_with_margin, int nrow_with_margin){
   }
 }
 
-int step(int *w1,int *w2, int order_of_ncol,int nrow) {
-#ifdef DEBUG
-  int * _world_from = w1;
-  int * _world_to = w2;
-  int _oncol  = order_of_ncol;
-  int _ncol  = (1<<_oncol) - 2;
-  int _nrow  = nrow;
-  for (int y = 1; y <= _nrow; y++) {
+#ifdef RAND_TEST
+int step(int *w1,int *w2, int order_of_ncol,int nrow,int * rand_map) {
 #else
-  register int * _world_from asm("r15") = w1;
-  register int * _world_to asm("r14") = w2;
-  register int _oncol asm("r13") = order_of_ncol;
-  register int _ncol asm("r12") = (1<<_oncol) - 2;
-  register int _nrow asm("r10") = nrow;
-  for (register int y asm("r9") = 1; y <= _nrow; y++) {
+int step(int *w1,int *w2, int order_of_ncol,int nrow) {
 #endif
-
     // initialize l/c/r cols.
     //
     //  1 2 3
@@ -90,6 +118,47 @@ int step(int *w1,int *w2, int order_of_ncol,int nrow) {
     #define VF8(x) VFF(x,_ncol+2)
     #define VF9(x) VFF(x,_ncol+3)
     #define VT(x)  _world_to[x]
+
+#ifdef RAND_TEST
+  register int * _world_from asm("r15") = w1;
+  register int * _world_to asm("r14") = w2;
+  register int _oncol asm("r13") = order_of_ncol;
+  register int _ncol asm("r12") = (1<<_oncol) - 2;
+  register int _nrow asm("r10") = nrow;
+  register int _count asm("r8") = _nrow*_ncol;
+  register int* _rand_map asm("r7") = rand_map;
+  register int _ofst asm("r6") = nrow + 3;
+
+  while(_count --) {
+    _ofst = _rand_map[_count];
+    register int _sum asm("r5") = 
+      VF1(_ofst) + VF2(_ofst) + VF3(_ofst) +
+      VF4(_ofst) + VF5(_ofst) + VF6(_ofst) +
+      VF7(_ofst) + VF8(_ofst) + VF9(_ofst);
+    VT(_ofst) = 0;
+    if ((_sum == 3) || ((_sum-VF5(_ofst)) == 3)) {
+      VT(_ofst) = 1;
+    }
+  }
+
+#else//RAND_TEST
+
+#ifdef DEBUG
+  int * _world_from = w1;
+  int * _world_to = w2;
+  int _oncol  = order_of_ncol;
+  int _ncol  = (1<<_oncol) - 2;
+  int _nrow  = nrow;
+  for (int y = 1; y <= _nrow; y++) {
+#else
+  register int * _world_from asm("r15") = w1;
+  register int * _world_to asm("r14") = w2;
+  register int _oncol asm("r13") = order_of_ncol;
+  register int _ncol asm("r12") = (1<<_oncol) - 2;
+  register int _nrow asm("r10") = nrow;
+  for (register int y asm("r9") = 1; y <= _nrow; y++) {
+#endif
+
 #ifdef DEBUG
     int tmp = (y<<_oncol)+1;
     int lcol = VF1(tmp) + VF4(tmp) + VF7(tmp);
@@ -125,6 +194,7 @@ int step(int *w1,int *w2, int order_of_ncol,int nrow) {
       }
     }
   }
+#endif//RAND_TEST
 }
 
 int initialize(int **world, int order_of_ncol, int nrow) {
@@ -193,6 +263,11 @@ typedef struct {
 //Thread
 void * thread_routine(void * param) {
   ThreadParams* tp = (ThreadParams*)param;
+
+#ifdef RAND_TEST
+  int *rand_map = createRandTable((1<<tp->order_of_ncol)-2,tp->nrow);
+#endif
+
   while(tp->num_of_generations -- ){
     int direction = (tp->num_of_generations%2);
     // 1 - waiting on semaphore
@@ -206,7 +281,11 @@ void * thread_routine(void * param) {
     }
 #endif
     // 2 - do the work:
+#ifdef RAND_TEST
+    step(direction?tp->w1:tp->w2,direction?tp->w2:tp->w1,tp->order_of_ncol,tp->nrow,rand_map);
+#else
     step(direction?tp->w1:tp->w2,direction?tp->w2:tp->w1,tp->order_of_ncol,tp->nrow);
+#endif
     // 3 - post the direction
 #ifdef DEBUG
       printf("Thread posting to sem@%p\n",tp->ps2);
@@ -218,6 +297,11 @@ void * thread_routine(void * param) {
     }
 #endif
   };
+
+#ifdef RAND_TEST
+  free(rand_map);
+#endif
+
   return NULL;
 }
 
