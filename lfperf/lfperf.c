@@ -31,6 +31,7 @@
 #define LFPF_CTRL_BUF_LEN (64)
 #define LFPF_VERSION FI_VERSION(1,5)
 #define LFPF_SERVER_PORT (10055)
+#define LF_USE_VADDR ((ct->fi->domain_attr->mr_mode) & (FI_MR_VIRT_ADDR|FI_MR_BASIC))
 
 #ifdef DEBUG
   #define dbgprintf( ... ) \
@@ -323,11 +324,12 @@ static int init_context(struct lfpf_ctxt *ct) {
   ct->ctrl_connfd = -1;
   ct->eq_attr.wait_obj = FI_WAIT_UNSPEC;
 
-  ct->hints->domain_attr->mr_mode = FI_MR_LOCAL | FI_MR_VIRT_ADDR | FI_MR_PROV_KEY;
+  // ct->hints->domain_attr->mr_mode = FI_MR_LOCAL | FI_MR_VIRT_ADDR | FI_MR_PROV_KEY;
+  ct->hints->domain_attr->mr_mode = FI_MR_BASIC;
   if (ct->opts.use_odp) {
     // ct->hints->domain_attr->mr_mode |= FI_MR_MMU_NOTIFY;
   } else {
-    ct->hints->domain_attr->mr_mode |= FI_MR_ALLOCATED;
+    // ct->hints->domain_attr->mr_mode |= FI_MR_ALLOCATED;
   }
   ct->hints->mode = FI_CONTEXT;
 
@@ -421,6 +423,7 @@ static int exchange_names_connected(struct lfpf_ctxt *ct) {
     }
     dbgprintf("client hints:\n%s.",fi_tostr(ct->hints,FI_TYPE_INFO));
     CALL_FI_API(ret=fi_getinfo(LFPF_VERSION, NULL, NULL, 0, ct->hints, &(ct->fi)),"fi_getinfo");
+    dbgprintf("client info:\n%s.",fi_tostr(ct->fi,FI_TYPE_INFO));
   } else {
     ret = send_name(ct, &ct->pep->fid);
     if (ret) {
@@ -617,13 +620,17 @@ static int start_rdma_client(struct lfpf_ctxt *ct) {
   dbgprintf("allocate memory...");
   CALL_FI_API( fi_mr_reg(ct->domain, ct->buf, ct->common_opts.buf_size<<1,
     FI_SEND | FI_RECV | FI_READ | FI_WRITE | FI_REMOTE_READ | FI_REMOTE_WRITE,
+    // 0, 0, 0, &(ct->mr), NULL), "fi_mr_reg()" );
     0, LFPF_MR_KEY, 0, &(ct->mr), NULL), "fi_mr_reg()" );
   ct->local_mr_key = fi_mr_key(ct->mr);
   if (ct->local_mr_key == FI_KEY_NOTAVAIL) {
     fprintf(stderr,"fail to get mr_key.\n");
     return -1;
   }
-  dbgprintf("memory registered:[%p-%p].",ct->buf,ct->buf+(ct->common_opts.buf_size<<1));
+  dbgprintf("client memory registered:[%p-%p].request key=0x%lx,received key=0x%lx",
+    ct->buf,ct->buf+(ct->common_opts.buf_size<<1),
+    // (int64_t)0,fi_mr_key(ct->mr));
+    (int64_t)LFPF_MR_KEY,fi_mr_key(ct->mr));
 
   // 6 - initialize the endpoint
   dbgprintf("initialize endpoint...");
@@ -745,6 +752,10 @@ static int start_rdma_server(struct lfpf_ctxt *ct) {
     fprintf(stderr,"fail to get mr_key.\n");
     return -1;
   }
+  dbgprintf("server memory registered:[%p-%p].request key=0x%lx,received key=0x%lx",
+    ct->buf,ct->buf+(ct->common_opts.buf_size<<1),
+    (int64_t)LFPF_MR_KEY,fi_mr_key(ct->mr));
+    // (int64_t)LFPF_MR_KEY,fi_mr_key(ct->mr));
 
   // 7 - binding the endpoint resources
   dbgprintf("binding the endpoint resources.");
@@ -852,7 +863,7 @@ static int run_one_sided_rdma(struct lfpf_ctxt *ct) {
             ct->common_opts.rx_size,
             (void *) ct->local_mr_key,
             ct->remote_fi_addr,
-            (ct->common_opts.use_buffer_offset?0:ct->remote_fi_addr) + (i%num_slots)*ct->common_opts.rx_size,
+            (LF_USE_VADDR?ct->remote_fi_addr:0) + (i%num_slots)*ct->common_opts.rx_size,
             ct->remote_mr_key,
             NULL),
             "fi_read()");
@@ -864,7 +875,7 @@ static int run_one_sided_rdma(struct lfpf_ctxt *ct) {
             ct->common_opts.tx_size,
             (void *) ct->local_mr_key,
             ct->remote_fi_addr,
-            (ct->common_opts.use_buffer_offset?0:ct->remote_fi_addr) + (i%num_slots)*ct->common_opts.tx_size,
+            (LF_USE_VADDR?ct->remote_fi_addr:0) + (i%num_slots)*ct->common_opts.tx_size,
             ct->remote_mr_key,
             NULL),
             "fi_write()");
@@ -928,7 +939,7 @@ static int run_one_sided_rdma(struct lfpf_ctxt *ct) {
             ct->common_opts.rx_size,
             (void *)ct->local_mr_key, // wired api
             ct->remote_fi_addr,
-            (ct->common_opts.use_buffer_offset?0:ct->remote_fi_addr) + (i%num_slots)*ct->common_opts.rx_size,
+            (LF_USE_VADDR?ct->remote_fi_addr:0) + (i%num_slots)*ct->common_opts.rx_size,
             ct->remote_mr_key,
             NULL),
             "fi_read()");
@@ -939,7 +950,7 @@ static int run_one_sided_rdma(struct lfpf_ctxt *ct) {
             ct->common_opts.tx_size,
             (void *)ct->local_mr_key, // wired api
             ct->remote_fi_addr,
-            (ct->common_opts.use_buffer_offset?0:ct->remote_fi_addr) + (i%num_slots)*ct->common_opts.tx_size,
+            (LF_USE_VADDR?ct->remote_fi_addr:0) + (i%num_slots)*ct->common_opts.tx_size,
             ct->remote_mr_key,
             NULL),
             "fi_write()");
@@ -1284,8 +1295,8 @@ void print_usage(const char *name, const char *desc) {
     "enable ODP(on-demand-paging)");
   fprintf(stderr, " %-20s %s\n", "--(i)ter <num_iter>",
     "number of iterations (1000)");
-  fprintf(stderr, " %-20s %s\n", "--buf(o)fst",
-    "use buffer offset for RDMA. By default, we use virtual address for RDMA. for 'socket providers, please enable this feature.'");
+//  fprintf(stderr, " %-20s %s\n", "--buf(o)fst",
+//    "use buffer offset for RDMA. By default, we use virtual address for RDMA. for 'socket providers, please enable this feature.'");
   fprintf(stderr, " %-20s %s\n", "--cliport|-C <client port>",
     "the port number used by the client (10055)");
   fprintf(stderr, " %-20s %s\n", "--svrport|-S <server port>",
