@@ -1,0 +1,137 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <errno.h>
+#include <time.h>
+
+/*
+  Shape of a 8x8 World: 
+  The actual space in the world is 6x6
+  # # # # # # # #
+ #              #
+ #              #
+ #              #
+ #              #
+ #              #
+ #              #
+ # # # # # # # #
+ */
+
+// (x,y) are coordination start from 1
+#define STATE(w,x,y,ox,shadow) \
+  (w[((y)<<(ox))+(x)] & (shadow))
+
+#define L_STATE(w,x,y,ox) \
+  (w[((y)<<(ox))+(x)])
+#ifdef DEBUG
+void dumpWorld(char *world, int upper_slot, int ncol_with_margin, int nrow_with_margin) {
+  int i,j;
+  char mask = (upper_slot)?0xf0:0xf;
+
+  printf("START>\n");
+  for(i=0;i<nrow_with_margin;i++) {
+    for(j=0;j<ncol_with_margin;j++) {
+      if(world[i*ncol_with_margin+j]&mask)
+        printf("* ");
+      else
+        printf("  ");
+    }
+    printf("\n");
+  }
+  printf("<END\n");
+}
+#endif
+
+int step(char *world,int order_of_ncol,int nrow,int upper_slot) {
+  register char shadow asm("r15") = (upper_slot)?0xf0:0xf;
+  register int rshift asm("r14") = (upper_slot)?4:0;
+  register int _nrow asm("r11") = nrow;
+  register int _ncol asm("r10") = (1<<order_of_ncol)-2;
+  register int _oncol asm("r9") = order_of_ncol;
+  register char * _world asm("r8") = world;
+
+  for (register int y asm("r13") = 1; y <= _nrow ; y ++) // y
+  for (register int x asm("r12") = 1; x <= _ncol ; x ++) // x
+  {
+    register int sum =
+      STATE(world,x-1,y-1,_oncol,shadow) +
+      STATE(world,x  ,y-1,_oncol,shadow) +
+      STATE(world,x+1,y-1,_oncol,shadow) +
+      STATE(world,x-1,y  ,_oncol,shadow) +
+      STATE(world,x+1,y  ,_oncol,shadow) +
+      STATE(world,x-1,y+1,_oncol,shadow) +
+      STATE(world,x  ,y+1,_oncol,shadow) +
+      STATE(world,x+1,y+1,_oncol,shadow);
+    sum = sum>>rshift;
+    if((STATE(_world,x,y,_oncol,shadow) && (sum == 2)) || (sum == 3)){
+      L_STATE(_world,x,y,_oncol) = STATE(_world,x,y,_oncol,shadow) | (char)(1<<(4-rshift)); // live
+    } else {
+      L_STATE(_world,x,y,order_of_ncol) = STATE(_world,x,y,_oncol,shadow); // die
+    }
+  }
+  return 0;
+}
+
+//
+int initialize(char **world, int order_of_ncol, int nrow) {
+  long ncol_with_margin = 1<<order_of_ncol;
+  long world_space_with_margin = ncol_with_margin * (nrow + 2);
+  *world = (char*)malloc(world_space_with_margin);
+  if (world == NULL) {
+    fprintf(stderr, "cannot allocate space for the world:error=%d.\n",errno);
+    return errno;
+  }
+
+  time_t t;
+  time(&t);
+  srand(t);
+
+  //initialize
+  for(int i=0;i<(world_space_with_margin);i++){
+    (*world)[i] = (char)(rand());
+    (*world)[i] &= 0x11;
+  }
+
+  return 0;
+}
+
+int destroy(char **world){
+  if(*world != NULL){
+    free(*world);
+    *world = NULL;
+  }
+  return 0;
+}
+
+int main(int argc, char **argv) {
+  if(argc < 4) {
+    printf("USAGE: %s <order of number of cols> <number of rows>  <Generation>\n",argv[0]);
+    return -1;
+  }
+
+  int order_of_ncol = atoi(argv[1]);
+  int nrow = atoi(argv[2]);
+  int num_of_generations = atoi(argv[3]);
+  int gcount = num_of_generations;
+  char *world = NULL;
+
+  if(initialize(&world,order_of_ncol,nrow)!=0) {
+    return -1;
+  }
+
+  struct timespec ts,te;
+  clock_gettime(CLOCK_REALTIME,&ts);
+  while(gcount--) {
+#ifdef DEBUG
+    dumpWorld(world, gcount%2, 1<<order_of_ncol,nrow+2);
+#endif
+    step(world,order_of_ncol,nrow,gcount%2);
+  }
+  clock_gettime(CLOCK_REALTIME,&te);
+
+  ssize_t tot_ns = (te.tv_sec-ts.tv_sec)*1000000000 + (te.tv_nsec-ts.tv_nsec);
+  ssize_t ncell = ((1L<<order_of_ncol)-2)*nrow;
+  ssize_t nworld = (1L<<(order_of_ncol))*(nrow + 2);
+  printf("%ld KB world;\t throughput = %.3fM cell generation per sec.\n", nworld>>10, (double)ncell*num_of_generations/tot_ns*1000);
+
+  destroy(&world);
+}
