@@ -125,7 +125,7 @@ static int default_context(struct lfpf_ctxt *ct) {
     return -1;
   }
 
-  ct->hints->caps = FI_MSG;
+  ct->hints->caps = FI_MSG|FI_RMA;
   ct->hints->mode = ~0; // all mode
 
   ct->hints->ep_attr->type = FI_EP_MSG;
@@ -324,12 +324,14 @@ static int init_context(struct lfpf_ctxt *ct) {
   ct->ctrl_connfd = -1;
   ct->eq_attr.wait_obj = FI_WAIT_UNSPEC;
 
-  // ct->hints->domain_attr->mr_mode = FI_MR_LOCAL | FI_MR_VIRT_ADDR | FI_MR_PROV_KEY;
-  ct->hints->domain_attr->mr_mode = FI_MR_BASIC;
+  ct->hints->domain_attr->mr_mode = FI_MR_LOCAL | FI_MR_VIRT_ADDR | FI_MR_PROV_KEY;
   if (ct->opts.use_odp) {
-    // ct->hints->domain_attr->mr_mode |= FI_MR_MMU_NOTIFY;
+    ct->hints->domain_attr->mr_mode |= FI_MR_MMU_NOTIFY;
   } else {
-    // ct->hints->domain_attr->mr_mode |= FI_MR_ALLOCATED;
+    ct->hints->domain_attr->mr_mode |= FI_MR_ALLOCATED;
+  }
+  if (strcmp(ct->hints->fabric_attr->prov_name,"sockets") == 0) {
+    ct->hints->domain_attr->mr_mode = FI_MR_BASIC;
   }
   ct->hints->mode = FI_CONTEXT;
 
