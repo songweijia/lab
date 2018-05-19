@@ -856,6 +856,42 @@ static int run_one_sided_rdma(struct lfpf_ctxt *ct) {
       // throughput
       clock_gettime(CLOCK_REALTIME,&tv_start);
       for(i=0;i<ct->common_opts.iterations;i++) {
+#if 1
+        struct fi_msg_rma msg;
+        struct iovec iov;
+        void *desc = (void *) ct->local_mr_key;
+        struct fi_rma_iov rma_iov;
+        //call send/recv
+        if(isRead) {
+          iov.iov_base = ct->rx_buf+(i%num_slots)*ct->common_opts.rx_size;
+          iov.iov_len = ct->common_opts.rx_size;
+          msg.msg_iov = &iov;
+          msg.desc = &desc;
+          msg.iov_count = 1;
+          msg.addr = ct->remote_fi_addr;
+          rma_iov.addr = (LF_USE_VADDR?ct->remote_fi_addr:0) + (i%num_slots)*ct->common_opts.rx_size;
+          rma_iov.len = ct->common_opts.rx_size;
+          rma_iov.key = ct->remote_mr_key;
+          msg.rma_iov = &rma_iov;
+          msg.rma_iov_count = 1;
+          msg.context = NULL;
+          CALL_FI_API(fi_readmsg(ct->ep,&msg,FI_COMPLETION),"fi_readmsg");
+        } else {
+          iov.iov_base = ct->tx_buf+(i%num_slots)*ct->common_opts.rx_size;
+          iov.iov_len = ct->common_opts.tx_size;
+          msg.msg_iov = &iov;
+          msg.desc = &desc;
+          msg.iov_count = 1;
+          msg.addr = ct->remote_fi_addr;
+          rma_iov.addr = (LF_USE_VADDR?ct->remote_fi_addr:0) + (i%num_slots)*ct->common_opts.tx_size;
+          rma_iov.len = ct->common_opts.rx_size;
+          rma_iov.key = ct->remote_mr_key;
+          msg.rma_iov = &rma_iov;
+          msg.rma_iov_count = 1;
+          msg.context = NULL;
+          CALL_FI_API(fi_writemsg(ct->ep,&msg,FI_COMPLETION),"fi_writemsg");
+        }
+#else
         // call send
         if(isRead){
           dbgprintf("local read buffer=%p",ct->rx_buf+(i%num_slots)*ct->common_opts.rx_size);
@@ -882,6 +918,7 @@ static int run_one_sided_rdma(struct lfpf_ctxt *ct) {
             NULL),
             "fi_write()");
         }
+#endif
         //waiting for completion
         if (++num_in_the_air == ct->common_opts.transfer_depth) {
           do {
